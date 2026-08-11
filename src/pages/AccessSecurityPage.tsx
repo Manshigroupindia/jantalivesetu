@@ -27,13 +27,13 @@ import {
   resetPinRateLimit 
 } from '../utils/security';
 import { logAuditEvent } from '../firebase/services/auditService';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { SUPER_ADMIN_EMAIL } from '../firebase/services/authService';
 
 export const AccessSecurityPage: React.FC = () => {
-  const { isSuperAdmin, profile, refreshProfile } = useAuth();
+  const { isSuperAdmin, profile, currentUser, refreshProfile } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
