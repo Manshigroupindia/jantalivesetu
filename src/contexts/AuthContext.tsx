@@ -4,6 +4,7 @@ import { auth, db } from '../config/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { User, StaffProfile } from '../types';
 import { getStaffProfileByUserId } from '../services/firestoreService';
+import { signOutUser } from '../services/authService';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let unsubUserDoc: (() => void) | null = null;
+    let unsubStaffDoc: (() => void) | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
@@ -40,38 +42,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (fbUser) {
         // Listen to live updates of user document
         const userRef = doc(db, 'users', fbUser.uid);
-        unsubUserDoc = onSnapshot(userRef, async (snap) => {
-          if (snap.exists()) {
-            const uData = snap.data() as User;
-            setUserDoc(uData);
+        unsubUserDoc = onSnapshot(
+          userRef,
+          async (snap) => {
+            if (snap.exists()) {
+              const uData = snap.data() as User;
+              if (uData.status === 'deleted') {
+                setUserDoc(null);
+                setStaffProfile(null);
+                setLoading(false);
+                alert('Your Janta Live Setu account has been removed. Please contact the Director.');
+                await signOutUser();
+                return;
+              }
+              setUserDoc(uData);
 
-            // Fetch corresponding staff profile
-            try {
-              const pData = await getStaffProfileByUserId(fbUser.uid);
-              setStaffProfile(pData);
-            } catch (err) {
-              console.error('Error fetching staff profile:', err);
+              // Fetch corresponding staff profile
+              try {
+                const pData = await getStaffProfileByUserId(fbUser.uid);
+                if (pData?.approvalStatus === 'deleted') {
+                  setUserDoc(null);
+                  setStaffProfile(null);
+                  setLoading(false);
+                  alert('Your Janta Live Setu account has been removed. Please contact the Director.');
+                  await signOutUser();
+                  return;
+                }
+                setStaffProfile(pData);
+              } catch (err) {
+                console.error('Error fetching staff profile:', err);
+              }
+            } else {
+              setUserDoc(null);
+              setStaffProfile(null);
             }
-          } else {
-            setUserDoc(null);
-            setStaffProfile(null);
+            setLoading(false);
+          },
+          (err) => {
+            console.error('User doc snapshot error:', err);
+            setLoading(false);
           }
-          setLoading(false);
-        }, (err) => {
-          console.error('User doc snapshot error:', err);
-          setLoading(false);
+        );
+
+        // Listen to live updates of staff profile document
+        const staffRef = doc(db, 'staffProfiles', fbUser.uid);
+        unsubStaffDoc = onSnapshot(staffRef, async (staffSnap) => {
+          if (staffSnap.exists()) {
+            const pData = staffSnap.data() as StaffProfile;
+            if (pData.approvalStatus === 'deleted') {
+              setUserDoc(null);
+              setStaffProfile(null);
+              setLoading(false);
+              alert('Your Janta Live Setu account has been removed. Please contact the Director.');
+              await signOutUser();
+              return;
+            }
+            setStaffProfile(pData);
+          }
         });
       } else {
         setUserDoc(null);
         setStaffProfile(null);
         setLoading(false);
         if (unsubUserDoc) unsubUserDoc();
+        if (unsubStaffDoc) unsubStaffDoc();
       }
     });
 
     return () => {
       unsubAuth();
       if (unsubUserDoc) unsubUserDoc();
+      if (unsubStaffDoc) unsubStaffDoc();
     };
   }, []);
 

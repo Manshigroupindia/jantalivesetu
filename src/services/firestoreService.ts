@@ -121,6 +121,67 @@ export async function saveStaffProfile(profile: Partial<StaffProfile>): Promise<
   return targetId;
 }
 
+export async function softDeleteStaffProfile(userId: string, deletedBy: string, reason?: string): Promise<void> {
+  const staffProfile = await getStaffProfile(userId);
+  const userDocSnap = await getDoc(doc(db, 'users', userId));
+  const userDocData = userDocSnap.exists() ? (userDocSnap.data() as User) : null;
+
+  const currentStatus = staffProfile?.approvalStatus || userDocData?.status || 'approved';
+  const now = new Date().toISOString();
+
+  await updateDoc(doc(db, 'users', userId), {
+    status: 'deleted',
+    approved: false,
+    deletedAt: now,
+    deletedBy,
+    previousStatus: currentStatus,
+    deletionReason: reason || '',
+    updatedAt: now,
+  });
+
+  if (staffProfile) {
+    await saveStaffProfile({
+      ...staffProfile,
+      approvalStatus: 'deleted',
+      deletedAt: now,
+      deletedBy,
+      previousStatus: currentStatus,
+      deletionReason: reason || '',
+    });
+  }
+}
+
+export async function restoreStaffProfile(userId: string, restoredBy: string): Promise<StaffApprovalStatus> {
+  const staffProfile = await getStaffProfile(userId);
+  const userDocSnap = await getDoc(doc(db, 'users', userId));
+  const userDocData = userDocSnap.exists() ? (userDocSnap.data() as User) : null;
+
+  const prevStatus = staffProfile?.previousStatus || userDocData?.previousStatus || 'approved';
+  const isApproved = (prevStatus === 'approved' || prevStatus === 'active');
+  const now = new Date().toISOString();
+
+  await updateDoc(doc(db, 'users', userId), {
+    status: prevStatus,
+    approved: isApproved,
+    deletedAt: null,
+    deletedBy: null,
+    deletionReason: null,
+    updatedAt: now,
+  });
+
+  if (staffProfile) {
+    await saveStaffProfile({
+      ...staffProfile,
+      approvalStatus: prevStatus,
+      deletedAt: undefined,
+      deletedBy: undefined,
+      deletionReason: undefined,
+    });
+  }
+
+  return prevStatus;
+}
+
 export async function deleteStaffProfile(userId: string): Promise<void> {
   await deleteDoc(doc(db, 'staffProfiles', userId));
   await deleteDoc(doc(db, 'users', userId));

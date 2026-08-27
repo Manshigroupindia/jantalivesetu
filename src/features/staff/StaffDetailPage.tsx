@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { DigitalIdCard } from '../../components/common/DigitalIdCard';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { getStaffProfileById, saveStaffProfile, setUserDoc, deleteStaffProfile } from '../../services/firestoreService';
+import { getStaffProfileById, saveStaffProfile, setUserDoc, softDeleteStaffProfile, deleteStaffProfile } from '../../services/firestoreService';
 import { StaffProfile } from '../../types';
 import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { logAuditEvent } from '../../services/auditService';
@@ -186,28 +186,28 @@ export const StaffDetailPage: React.FC = () => {
     });
   };
 
-  const handlePermanentDeleteStaff = () => {
+  const handleSoftDeleteStaff = () => {
     if (deleteConfirmText.trim() !== 'DELETE') {
-      alert('Please type DELETE to confirm permanent deletion.');
+      alert('Please type DELETE to confirm moving staff record to Bin.');
       return;
     }
 
-    requirePinVerification('PERMANENTLY DELETE STAFF ACCOUNT', async () => {
+    requirePinVerification('DELETE STAFF ACCOUNT & MOVE TO BIN', async () => {
       setUpdating(true);
       try {
-        await deleteStaffProfile(staff.userId);
+        await softDeleteStaffProfile(staff.userId, currentUser?.uid || 'director');
 
         await logAuditEvent({
           userId: currentUser?.uid || 'director',
           userName: 'Director',
           userRole: 'director',
-          action: 'STAFF_PERMANENTLY_DELETED',
+          action: 'STAFF_MOVED_TO_BIN',
           module: 'staff',
           recordId: staff.userId,
         });
 
         setDeleteModalOpen(false);
-        alert(`Staff account for ${staff.fullName} has been permanently deleted.`);
+        alert(`Staff account for ${staff.fullName} has been deleted and moved to Bin. Remote devices logged out.`);
         navigate('/staff');
       } catch (err: any) {
         console.error('Delete staff error:', err);
@@ -497,24 +497,27 @@ export const StaffDetailPage: React.FC = () => {
       </Modal>
 
       {/* DELETE MODAL */}
-      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Permanently Delete Staff Record?">
-        <div className="space-y-4 py-2">
-          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-2">
+      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Move Staff Record to Bin?">
+        <div className="space-y-4 py-2 text-xs">
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 space-y-2">
             <div className="flex items-center gap-2 font-black text-red-900 text-sm">
               <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
-              <span>DANGER: Irreversible Action</span>
+              <span>Delete Staff & Terminate Active Access</span>
             </div>
             <p>
-              You are about to permanently delete staff member <strong>{staff.fullName}</strong> (ID: <span className="font-mono">{staff.idNumber}</span>, Email: {staff.email}).
+              You are about to delete staff member <strong>{staff.fullName}</strong> (ID: <span className="font-mono">{staff.idNumber}</span>).
             </p>
-            <p className="text-[11px] text-red-700">
-              This will permanently delete the staff profile and account credentials. Historical accounting and audit records will remain preserved for audit compliance.
-            </p>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-red-700 font-medium">
+              <li>This staff member will immediately lose access to Janta Live Setu.</li>
+              <li>Active sessions across all logged-in devices will be logged out instantly.</li>
+              <li>The staff profile record will be moved to the Director Bin / Trash.</li>
+              <li>Historical attendance, salary, expense, and accounting records will NOT be destroyed.</li>
+            </ul>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-700 block">
-              Type <span className="font-mono text-red-600">DELETE</span> to confirm permanent deletion:
+              Type <span className="font-mono text-red-600">DELETE</span> to continue:
             </label>
             <Input
               value={deleteConfirmText}
@@ -533,9 +536,9 @@ export const StaffDetailPage: React.FC = () => {
               size="sm"
               loading={updating}
               disabled={deleteConfirmText.trim() !== 'DELETE'}
-              onClick={handlePermanentDeleteStaff}
+              onClick={handleSoftDeleteStaff}
             >
-              Confirm Permanent Delete
+              Confirm Delete & Move to Bin
             </Button>
           </div>
         </div>

@@ -5,22 +5,30 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
-import { Users, UserPlus, Search, Eye } from 'lucide-react';
+import { Users, UserPlus, Search, Eye, Trash2, RotateCcw, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { StaffProfile, UserRole } from '../../types';
 import { createStaffAccountByDirector } from '../../services/authService';
+import { restoreStaffProfile, deleteStaffProfile } from '../../services/firestoreService';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSecurity } from '../../contexts/SecurityContext';
 import { useNavigate } from 'react-router-dom';
 
 export const StaffListPage: React.FC = () => {
   const navigate = useNavigate();
   const { userDoc } = useAuth();
+  const { requirePinVerification } = useSecurity();
   const { data: staffList, loading } = useRealtimeCollection<StaffProfile>('staffProfiles');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // Destroy Modal state
+  const [permanentDestroyModalOpen, setPermanentDestroyModalOpen] = useState(false);
+  const [selectedStaffForPermanentDestroy, setSelectedStaffForPermanentDestroy] = useState<StaffProfile | null>(null);
+  const [permanentDestroyConfirmText, setPermanentDestroyConfirmText] = useState('');
 
   // New Staff Form State
   const [fullName, setFullName] = useState('');
@@ -77,30 +85,90 @@ export const StaffListPage: React.FC = () => {
     }
   };
 
-    // Deduplicate by canonical userId / profile ID
-    const uniqueStaffMap = new Map<string, StaffProfile>();
-    staffList.forEach((s) => {
-      const key = s.userId || s.id;
-      if (!uniqueStaffMap.has(key)) {
-        uniqueStaffMap.set(key, s);
-      } else {
-        const existing = uniqueStaffMap.get(key)!;
-        if (s.approvalStatus !== 'pending_profile' && existing.approvalStatus === 'pending_profile') {
-          uniqueStaffMap.set(key, s);
-        }
+  const handleRestoreStaff = (staffItem: StaffProfile) => {
+    requirePinVerification(`Restore Staff Member (${staffItem.fullName})`, async () => {
+      try {
+        const restoredStatus = await restoreStaffProfile(staffItem.userId, userDoc?.uid || 'director');
+        await logAuditEvent({
+          userId: userDoc?.uid || 'director',
+          userName: 'Director',
+          userRole: 'director',
+          action: 'STAFF_RESTORED_FROM_BIN',
+          module: 'staff',
+          recordId: staffItem.userId,
+        });
+        alert(`Staff member ${staffItem.fullName} restored successfully under status (${restoredStatus.toUpperCase()}).`);
+      } catch (err: any) {
+        alert('Failed to restore staff member. Check security permissions.');
       }
     });
+  };
 
-    const filteredStaff = Array.from(uniqueStaffMap.values()).filter((s) => {
-      const matchesSearch =
-        s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.workingArea.toLowerCase().includes(searchTerm.toLowerCase());
+  const handlePermanentDestroyStaff = (staffItem: StaffProfile) => {
+    setSelectedStaffForPermanentDestroy(staffItem);
+    setPermanentDestroyConfirmText('');
+    setPermanentDestroyModalOpen(true);
+  };
 
-      const matchesStatus = statusFilter === 'all' || s.approvalStatus === statusFilter;
-      return matchesSearch && matchesStatus;
+  const confirmPermanentDestroy = () => {
+    if (!selectedStaffForPermanentDestroy) return;
+    if (permanentDestroyConfirmText.trim() !== 'DELETE FOREVER') {
+      alert('Please type DELETE FOREVER to confirm permanent record destruction.');
+      return;
+    }
+
+    requirePinVerification('PERMANENTLY DESTROY STAFF RECORD', async () => {
+      try {
+        await deleteStaffProfile(selectedStaffForPermanentDestroy.userId);
+        await logAuditEvent({
+          userId: userDoc?.uid || 'director',
+          userName: 'Director',
+          userRole: 'director',
+          action: 'STAFF_PERMANENTLY_DESTROYED',
+          module: 'staff',
+          recordId: selectedStaffForPermanentDestroy.userId,
+        });
+        setPermanentDestroyModalOpen(false);
+        alert(`Staff record for ${selectedStaffForPermanentDestroy.fullName} has been permanently destroyed.`);
+      } catch (err: any) {
+        alert('Failed to permanently destroy staff record.');
+      }
     });
+  };
+
+  // Deduplicate by canonical userId / profile ID
+  const uniqueStaffMap = new Map<string, StaffProfile>();
+  staffList.forEach((s) => {
+    const key = s.userId || s.id;
+    if (!uniqueStaffMap.has(key)) {
+      uniqueStaffMap.set(key, s);
+    } else {
+      const existing = uniqueStaffMap.get(key)!;
+      if (s.approvalStatus !== 'pending_profile' && existing.approvalStatus === 'pending_profile') {
+        uniqueStaffMap.set(key, s);
+      }
+    }
+  });
+
+  const allStaffArray = Array.from(uniqueStaffMap.values());
+  const activeStaffList = allStaffArray.filter((s) => s.approvalStatus !== 'deleted');
+  const binStaffList = allStaffArray.filter((s) => s.approvalStatus === 'deleted');
+
+  const filteredStaff = allStaffArray.filter((s) => {
+    const matchesSearch =
+      s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.workingArea.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (statusFilter === 'all') {
+      return matchesSearch && s.approvalStatus !== 'deleted';
+    }
+    if (statusFilter === 'deleted') {
+      return matchesSearch && s.approvalStatus === 'deleted';
+    }
+    return matchesSearch && s.approvalStatus === statusFilter;
+  });
 
   return (
     <div className="space-y-6">
@@ -125,27 +193,84 @@ export const StaffListPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* FILTERS */}
-      <Card className="p-4 flex flex-col sm:flex-row items-center gap-3">
-        <div className="flex-1 w-full">
-          <Input
-            placeholder="Search by name, email, designation, or area..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
+      {/* TABS & FILTERS */}
+      <Card className="p-4 space-y-4">
+        <div className="flex items-center gap-2 border-b border-gray-100 pb-3 overflow-x-auto">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
+              statusFilter === 'all'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            All Active Staff ({activeStaffList.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('approved')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
+              statusFilter === 'approved'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Approved & Active
+          </button>
+          <button
+            onClick={() => setStatusFilter('under_review')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
+              statusFilter === 'under_review'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Pending Approval
+          </button>
+          <button
+            onClick={() => setStatusFilter('suspended')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
+              statusFilter === 'suspended'
+                ? 'bg-red-500 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Suspended
+          </button>
+          <button
+            onClick={() => setStatusFilter('deleted')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+              statusFilter === 'deleted'
+                ? 'bg-gray-900 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            Bin / Trash ({binStaffList.length})
+          </button>
         </div>
-        <div className="w-full sm:w-48">
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={[
-              { value: 'all', label: 'All Statuses' },
-              { value: 'approved', label: 'Approved & Active' },
-              { value: 'under_review', label: 'Pending Approval' },
-              { value: 'suspended', label: 'Suspended' },
-            ]}
-          />
+
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex-1 w-full">
+            <Input
+              placeholder="Search by name, email, designation, or area..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              icon={<Search className="w-4 h-4" />}
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={[
+                { value: 'all', label: `All Active Staff (${activeStaffList.length})` },
+                { value: 'approved', label: 'Approved & Active' },
+                { value: 'under_review', label: 'Pending Approval' },
+                { value: 'suspended', label: 'Suspended' },
+                { value: 'deleted', label: `🗑 Bin / Trash (${binStaffList.length})` },
+              ]}
+            />
+          </div>
         </div>
       </Card>
 
@@ -153,9 +278,19 @@ export const StaffListPage: React.FC = () => {
       {loading ? (
         <p className="text-xs text-gray-400 animate-pulse text-center py-8">Loading staff directory...</p>
       ) : filteredStaff.length === 0 ? (
-        <Card className="p-8 text-center text-gray-500 text-xs italic">
-          No staff records match your current search filters.
-        </Card>
+        statusFilter === 'deleted' ? (
+          <Card className="p-12 text-center space-y-3 border-dashed border-2 border-gray-200">
+            <Trash2 className="w-12 h-12 text-gray-300 mx-auto" />
+            <h3 className="text-base font-bold text-gray-800">Trash / Bin is Empty</h3>
+            <p className="text-xs text-gray-500 max-w-sm mx-auto">
+              Deleted staff members will appear here. You can view details, restore them back to active status, or permanently destroy records.
+            </p>
+          </Card>
+        ) : (
+          <Card className="p-8 text-center text-gray-500 text-xs italic">
+            No staff records match your current search filters.
+          </Card>
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredStaff.map((staff) => (
@@ -180,12 +315,14 @@ export const StaffListPage: React.FC = () => {
                         ? 'success'
                         : staff.approvalStatus === 'under_review'
                         ? 'warning'
+                        : staff.approvalStatus === 'deleted'
+                        ? 'danger'
                         : 'danger'
                     }
                     size="sm"
-                    className="mt-1.5"
+                    className="mt-1.5 uppercase font-mono"
                   >
-                    {staff.approvalStatus.toUpperCase()}
+                    {staff.approvalStatus}
                   </Badge>
                 </div>
               </div>
@@ -203,17 +340,46 @@ export const StaffListPage: React.FC = () => {
                   <span className="text-gray-400">Contact:</span>
                   <span className="font-medium text-gray-900">{staff.contactNumber}</span>
                 </div>
+                {staff.approvalStatus === 'deleted' && (
+                  <div className="pt-2 border-t text-[11px] text-red-600 space-y-0.5">
+                    <p className="font-bold">Deleted on: {staff.deletedAt ? staff.deletedAt.split('T')[0] : 'N/A'}</p>
+                    <p>Previous Status: <span className="font-mono font-bold uppercase">{staff.previousStatus || 'N/A'}</span></p>
+                  </div>
+                )}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full mt-2"
-                icon={<Eye className="w-3.5 h-3.5" />}
-                onClick={() => navigate(`/staff/${staff.id}`)}
-              >
-                View Complete Staff File & ID Card
-              </Button>
+              {staff.approvalStatus === 'deleted' ? (
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    icon={<RotateCcw className="w-3.5 h-3.5 text-emerald-600" />}
+                    onClick={() => handleRestoreStaff(staff)}
+                  >
+                    Restore
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    className="flex-1"
+                    icon={<Trash2 className="w-3.5 h-3.5" />}
+                    onClick={() => handlePermanentDestroyStaff(staff)}
+                  >
+                    Delete Forever
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  icon={<Eye className="w-3.5 h-3.5" />}
+                  onClick={() => navigate(`/staff/${staff.id}`)}
+                >
+                  View Complete Staff File & ID Card
+                </Button>
+              )}
             </Card>
           ))}
         </div>
@@ -311,6 +477,55 @@ export const StaffListPage: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* PERMANENT DESTROY MODAL */}
+      <Modal
+        isOpen={permanentDestroyModalOpen}
+        onClose={() => setPermanentDestroyModalOpen(false)}
+        title="Permanently Destroy Staff Record"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-red-900">
+              <h4 className="font-extrabold text-sm">Destructive Action Warning</h4>
+              <p>
+                You are about to permanently destroy the system profile for{' '}
+                <span className="font-extrabold">{selectedStaffForPermanentDestroy?.fullName}</span> (ID:{' '}
+                <span className="font-mono font-bold">{selectedStaffForPermanentDestroy?.idNumber}</span>).
+              </p>
+              <p className="text-[11px] text-red-700">
+                This record will be permanently deleted from the staff directory and Bin. Historical accounting, attendance, and expense records will remain preserved for legal/financial audit.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-bold text-gray-700">
+              Type <span className="font-mono text-red-600 font-extrabold select-all">DELETE FOREVER</span> to confirm:
+            </p>
+            <Input
+              placeholder="DELETE FOREVER"
+              value={permanentDestroyConfirmText}
+              onChange={(e) => setPermanentDestroyConfirmText(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button variant="ghost" className="w-full" onClick={() => setPermanentDestroyModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              className="w-full"
+              disabled={permanentDestroyConfirmText.trim() !== 'DELETE FOREVER'}
+              onClick={confirmPermanentDestroy}
+            >
+              Destroy Permanently
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -41,6 +41,10 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }
 
+  if (userDoc.status === 'deleted' || staffProfile?.approvalStatus === 'deleted') {
+    return <Navigate to="/login" replace />;
+  }
+
   // Staff First Login Profile Completion & Approval Guard
   if (userDoc.role === 'staff') {
     if (userDoc.status === 'pending_profile' || !staffProfile) {
@@ -51,7 +55,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
       if (location.pathname !== '/pending-approval') {
         return <Navigate to="/pending-approval" replace />;
       }
-    } else if (userDoc.status === 'suspended' || userDoc.status === 'deactivated') {
+    } else if (userDoc.status === 'suspended' || userDoc.status === 'deactivated' || staffProfile?.approvalStatus === 'suspended') {
       return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
           <div className="bg-white p-8 rounded-2xl border border-red-200 shadow-card max-w-md text-center space-y-3">

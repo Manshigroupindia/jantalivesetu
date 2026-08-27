@@ -48,6 +48,14 @@ export const LoginPage: React.FC = () => {
         }
       }
 
+      if (userDoc.status === 'deleted') {
+        const { signOutUser } = await import('../../services/authService');
+        await signOutUser();
+        setError('Your Janta Live Setu account has been removed. Please contact the Director.');
+        setLoading(false);
+        return;
+      }
+
       await refreshUserDoc();
 
       if (userDoc.role === 'director') {

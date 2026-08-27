@@ -2,7 +2,7 @@
 
 export type UserRole = 'director' | 'admin' | 'staff';
 
-export type StaffApprovalStatus = 'pending_profile' | 'under_review' | 'approved' | 'rejected' | 'suspended' | 'deactivated' | 'active';
+export type StaffApprovalStatus = 'pending_profile' | 'under_review' | 'approved' | 'rejected' | 'suspended' | 'deactivated' | 'active' | 'deleted';
 
 export interface LocationRecord {
   latitude: number;
@@ -30,6 +30,10 @@ export interface User {
   pincode?: string;
   country?: string;
   bio?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  previousStatus?: StaffApprovalStatus;
+  deletionReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +60,10 @@ export interface StaffProfile {
   joinedDate: string;
   validUpto: string;
   createdById: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  previousStatus?: StaffApprovalStatus;
+  deletionReason?: string;
   createdAt: string;
   updatedAt: string;
 }
