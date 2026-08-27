@@ -135,8 +135,9 @@ export interface ChatMessage {
   mediaUrl?: string;
   fileUrl?: string;
   fileName?: string;
-  read: boolean;
-  timestamp: string;
+  read?: boolean;
+  timestamp?: string;
+  createdAt?: string;
 }
 
 export interface ChatRoom {
@@ -202,6 +203,7 @@ export interface WaterRecord {
   pricePerBottle?: number;
   bottlePrice?: number;
   totalCost?: number;
+  receiptUrl?: string;
   receiptPhotoUrl?: string;
   loggedById?: string;
   loggedByUserId?: string;
@@ -225,6 +227,7 @@ export interface ElectricityRecord {
   totalAmount?: number;
   meterPhotoUrl?: string;
   notes?: string;
+  isPaid?: boolean;
   loggedById?: string;
   loggedByUserId?: string;
   loggedByUserName?: string;
