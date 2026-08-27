@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { orderBy } from 'firebase/firestore';
 
 export const ClientDirectoryPage: React.FC = () => {
-  const { userDoc, staffProfile } = useAuth();
+  const { userDoc } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [clientName, setClientName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -51,6 +51,7 @@ export const ClientDirectoryPage: React.FC = () => {
       setPhone('');
       setEmail('');
       setAddress('');
+      setNotes('');
       alert('Client record added to directory.');
     } catch (err) {
       alert('Failed to add client.');
@@ -141,6 +142,7 @@ export const ClientDirectoryPage: React.FC = () => {
           </div>
           <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} required />
           <Input label="GSTIN / Registration Number (Optional)" value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} />
+          <Input label="Notes (Optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
 
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="ghost" className="w-full" onClick={() => setModalOpen(false)}>

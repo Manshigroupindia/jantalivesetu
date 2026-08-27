@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { VoiceRecorder } from '../../components/common/VoiceRecorder';
 import { AudioPlayer } from '../../components/common/AudioPlayer';
 import { FileUploader } from '../../components/common/FileUploader';
-import { Briefcase, Plus, Search, Calendar, Mic, Clock, CheckCircle2, AlertCircle, FileText, User } from 'lucide-react';
+import { Briefcase, Plus, Search, Clock, CheckCircle2, FileText, User } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';

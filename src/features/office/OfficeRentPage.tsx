@@ -8,7 +8,6 @@ import { Building, Lock } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { OfficeRentRecord } from '../../types';
 import { createOfficeRentRecord } from '../../services/firestoreService';
-import { getCurrentDateISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { formatINR } from '../../utils/formatters';
@@ -144,7 +143,7 @@ export const OfficeRentPage: React.FC = () => {
                       Rent for {r.month} ({r.landlordName})
                     </p>
                     <p className="text-[11px] text-gray-500">
-                      Mode: {r.paymentMode.toUpperCase()} | Ref: {r.transactionRef || 'N/A'}
+                      Mode: {(r.paymentMode || 'ONLINE').toUpperCase()} | Ref: {r.transactionRef || 'N/A'}
                     </p>
                   </div>
                   <span className="text-sm font-black text-purple-600 font-mono">{formatINR(r.rentAmount)}</span>

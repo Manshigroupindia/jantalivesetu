@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Mic, Square, Play, Trash2, Upload, Loader2, Check } from 'lucide-react';
+import { Mic, Square, Trash2, Upload, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSalaryBreakdown, calculateMonthlySalary } from '../services/salaryCalculator';
+import { calculateSalaryBreakdown } from '../services/salaryCalculator';
 import { AttendanceRecord, CompanyHoliday } from '../types';
 
 describe('Janta Live Setu Central Salary Engine Tests', () => {

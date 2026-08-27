@@ -5,22 +5,18 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
-import { Users, UserPlus, Search, Shield, ShieldAlert, Eye, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Search, Eye } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { StaffProfile, User, UserRole } from '../../types';
+import { StaffProfile, UserRole } from '../../types';
 import { createStaffAccountByDirector } from '../../services/authService';
-import { setUserDoc, saveStaffProfile } from '../../services/firestoreService';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSecurity } from '../../contexts/SecurityContext';
 import { useNavigate } from 'react-router-dom';
 
 export const StaffListPage: React.FC = () => {
   const navigate = useNavigate();
   const { userDoc } = useAuth();
-  const { requirePinVerification } = useSecurity();
   const { data: staffList, loading } = useRealtimeCollection<StaffProfile>('staffProfiles');
-  const { data: userAccounts } = useRealtimeCollection<User>('users');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');

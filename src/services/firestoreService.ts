@@ -9,7 +9,6 @@ import {
   addDoc,
   query,
   where,
-  orderBy,
   limit,
   onSnapshot,
   QueryConstraint
@@ -31,7 +30,6 @@ import {
   SalaryRecord,
   Notice,
   CompanyHoliday,
-  AuditLog,
   ClientRecord
 } from '../types';
 

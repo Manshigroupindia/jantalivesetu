@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { FileUploader } from '../../components/common/FileUploader';
-import { Sparkles, ShieldCheck } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { CleaningRecord } from '../../types';
 import { createCleaningRecord } from '../../services/firestoreService';
@@ -137,9 +137,9 @@ export const OfficeCleanlinessPage: React.FC = () => {
                 <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs">
                   <div>
                     <p className="font-extrabold text-gray-900 uppercase">
-                      {r.cleaningArea.replace('_', ' ')} ({r.cleanerName})
+                      {(r.cleaningArea || r.type || 'office').replace('_', ' ')} ({r.cleanerName})
                     </p>
-                    <p className="text-[11px] text-gray-500">By {r.loggedByName} | {r.date}</p>
+                    <p className="text-[11px] text-gray-500">By {r.loggedByName || 'Staff'} | {r.date || r.month}</p>
                   </div>
                   <span className="text-sm font-black text-indigo-600 font-mono">{formatINR(r.amountPaid)}</span>
                 </div>

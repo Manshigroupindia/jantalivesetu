@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Lock, Mail, ShieldCheck, UserCheck, KeyRound, AlertCircle, ArrowLeft } from 'lucide-react';

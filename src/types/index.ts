@@ -2,7 +2,7 @@
 
 export type UserRole = 'director' | 'admin' | 'staff';
 
-export type StaffApprovalStatus = 'pending_profile' | 'under_review' | 'approved' | 'rejected' | 'suspended' | 'deactivated';
+export type StaffApprovalStatus = 'pending_profile' | 'under_review' | 'approved' | 'rejected' | 'suspended' | 'deactivated' | 'active';
 
 export interface LocationRecord {
   latitude: number;
@@ -91,8 +91,8 @@ export interface AttendanceRecord {
   updatedAt: string;
 }
 
-export type WorkPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type WorkStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed';
+export type WorkPriority = 'low' | 'medium' | 'high' | 'urgent' | 'normal';
+export type WorkStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'submitted';
 
 export interface WorkAssignment {
   id: string;
@@ -102,7 +102,9 @@ export interface WorkAssignment {
   assignedToName: string;
   createdBy: string; // userId
   createdByName: string;
+  assignedById?: string;
   dueDate: string; // YYYY-MM-DD
+  deadlineDate?: string;
   priority: WorkPriority;
   textInstructions?: string;
   voiceNoteUrl?: string;
@@ -122,9 +124,12 @@ export interface ChatMessage {
   senderId: string;
   senderName: string;
   senderRole: UserRole;
+  senderPhotoUrl?: string;
   text?: string;
   imageUrl?: string;
   audioUrl?: string;
+  voiceNoteUrl?: string;
+  mediaUrl?: string;
   fileUrl?: string;
   fileName?: string;
   read: boolean;
@@ -141,13 +146,14 @@ export interface ChatRoom {
   updatedAt: string;
 }
 
-export type ExpenseCategory = 'travel' | 'office_supplies' | 'client_meeting' | 'food' | 'maintenance' | 'other';
+export type ExpenseCategory = 'travel' | 'office_supplies' | 'client_meeting' | 'food' | 'maintenance' | 'other' | 'Travel & Reporting' | 'Equipment & Hardware' | 'Food & Meals' | 'Office Supplies' | 'Utility & Maintenance';
 export type ExpenseStatus = 'pending' | 'approved' | 'paid' | 'rejected';
 
 export interface ExpenseItem {
   id: string;
   userId: string;
   userName: string;
+  userDesignation?: string;
   amount: number; // in INR
   title: string;
   category: ExpenseCategory;
@@ -169,10 +175,15 @@ export interface TeaSnackLog {
   type: 'tea' | 'snack';
   date: string;
   count?: number;
+  itemType?: string;
+  quantity?: number;
+  unitPrice?: number;
+  totalPrice?: number;
   itemDescription?: string;
   amount: number;
   loggedByUserId: string;
   loggedByUserName: string;
+  loggedByName?: string;
   notes?: string;
   createdAt: string;
 }
@@ -182,10 +193,13 @@ export interface WaterRecord {
   date: string;
   arrived: boolean;
   numberOfBottles: number;
+  bottlesCount?: number;
+  supplierName?: string;
   pricePerBottle: number;
   totalCost: number;
   loggedByUserId: string;
   loggedByUserName: string;
+  loggedByName?: string;
   status: 'unpaid' | 'paid';
   paidAt?: string;
   note?: string;
@@ -200,9 +214,11 @@ export interface ElectricityRecord {
   currentReading: number;
   unitsConsumed: number;
   ratePerUnit: number;
+  unitRate?: number;
   totalAmount: number;
   loggedByUserId: string;
   loggedByUserName: string;
+  loggedByName?: string;
   status: 'pending' | 'paid';
   paidAt?: string;
   paidBy?: string;
@@ -215,6 +231,9 @@ export interface OfficeRentRecord {
   month: string;
   rentAmount: number;
   dueDate: string;
+  landlordName?: string;
+  paymentMode?: string;
+  transactionRef?: string;
   status: 'pending' | 'paid';
   paymentDate?: string;
   notes?: string;
@@ -227,10 +246,13 @@ export interface CleaningRecord {
   id: string;
   type: 'office' | 'toilet';
   month: string;
+  date?: string;
+  cleaningArea?: string;
   cleanerName: string;
   amountPaid: number;
   status: 'pending' | 'paid';
   paymentDate?: string;
+  loggedByName?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -312,6 +334,7 @@ export interface Notice {
   attachmentUrl?: string;
   expiryDate?: string;
   isPinned: boolean;
+  createdById?: string;
   createdByName: string;
   createdAt: string;
 }

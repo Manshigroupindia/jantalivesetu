@@ -9,7 +9,6 @@ import {
   Receipt,
   Clock,
   LogOut,
-  Lock,
   ChevronRight
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -21,7 +20,7 @@ export const MobileNav: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { companySettings } = useCompany();
   const { userDoc, staffProfile } = useAuth();
-  const { can, role, isDirector } = usePermissions();
+  const { can, role } = usePermissions();
 
   const handleLogout = async () => {
     if (confirm('Are you sure you want to sign out?')) {

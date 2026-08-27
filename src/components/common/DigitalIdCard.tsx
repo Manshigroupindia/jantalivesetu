@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StaffProfile, CompanySettings } from '../../types';
-import { Shield, RotateCw, Printer, Download, Mail, Phone, Globe, MapPin } from 'lucide-react';
+import { Shield, RotateCw, Printer, Mail, Phone, Globe, MapPin } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export interface DigitalIdCardProps {

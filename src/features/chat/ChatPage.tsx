@@ -1,17 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { VoiceRecorder } from '../../components/common/VoiceRecorder';
 import { AudioPlayer } from '../../components/common/AudioPlayer';
 import { FileUploader } from '../../components/common/FileUploader';
-import { MessageSquare, Send, Image, Mic, Paperclip, CheckCheck, FileText } from 'lucide-react';
+import { MessageSquare, Send, Mic, Paperclip, FileText } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { ChatMessage, StaffProfile } from '../../types';
+import { ChatMessage } from '../../types';
 import { sendChatMessage } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderBy, limit } from 'firebase/firestore';
-import { getCurrentTimeFormatted } from '../../utils/dateUtils';
 
 export const ChatPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();

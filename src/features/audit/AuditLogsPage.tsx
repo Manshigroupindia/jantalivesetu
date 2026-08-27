@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card } from '../../components/ui/Card';
-import { Lock, Shield, Calendar, User } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AuditLog } from '../../types';
 import { orderBy } from 'firebase/firestore';

@@ -29,7 +29,9 @@ export type PermissionKey =
   | 'rent.manage'
   | 'cleaning.manage'
   | 'notice.manage'
+  | 'notices.create'
   | 'holiday.manage'
+  | 'holidays.manage'
   | 'settings.manage'
   | 'chat.use'
   | 'reports.view'
@@ -64,7 +66,9 @@ const PERMISSION_MATRIX: Record<PermissionKey, UserRole[]> = {
   'rent.manage': ['director', 'admin'],
   'cleaning.manage': ['director', 'admin'],
   'notice.manage': ['director', 'admin'],
+  'notices.create': ['director', 'admin'],
   'holiday.manage': ['director', 'admin'],
+  'holidays.manage': ['director', 'admin'],
   'settings.manage': ['director'],
   'chat.use': ['director', 'admin', 'staff'],
   'reports.view': ['director', 'admin'],

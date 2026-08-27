@@ -9,8 +9,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getStaffProfileById, saveStaffProfile, setUserDoc } from '../../services/firestoreService';
 import { StaffProfile } from '../../types';
-import { ArrowLeft, CheckCircle2, XCircle, Shield, FileText, DollarSign, Mail, Phone, MapPin } from 'lucide-react';
-import { formatINR } from '../../utils/formatters';
+import { ArrowLeft, CheckCircle2, XCircle, FileText } from 'lucide-react';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -66,7 +65,7 @@ export const StaffDetailPage: React.FC = () => {
       setUpdating(true);
       try {
         await saveStaffProfile({ ...staff, approvalStatus: 'approved' });
-        await setUserDoc(staff.userId, { status: 'active', approved: true });
+        await setUserDoc(staff.userId, { status: 'approved', approved: true });
 
         await logAuditEvent({
           userId: currentUser?.uid || 'director',

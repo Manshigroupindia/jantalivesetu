@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
-import { MapPin, Clock, ShieldCheck, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, AlertCircle } from 'lucide-react';
 import { useGeolocation } from '../../../hooks/useGeolocation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { recordDutyCheckIn, recordDutyCheckOut } from '../../../services/firestoreService';
@@ -80,7 +80,6 @@ export const DutyCard: React.FC = () => {
       const timeStr = getCurrentTimeFormatted();
 
       // Calculate total working minutes
-      const [checkInH, checkInM] = todayAttendance.checkIn.split(':');
       const now = new Date();
       const totalMinutes = Math.max(30, Math.round((now.getTime() - new Date(todayAttendance.createdAt).getTime()) / 60000));
 

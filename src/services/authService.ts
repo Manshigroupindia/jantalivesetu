@@ -2,12 +2,11 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
-  createUserWithEmailAndPassword,
-  updatePassword
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { User, UserRole, StaffApprovalStatus } from '../types';
+import { User, UserRole } from '../types';
 
 export const DIRECTOR_FIXED_EMAIL = 'devenjhaofficial@gmail.com';
 

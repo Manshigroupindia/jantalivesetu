@@ -3,7 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { Coffee, Plus, Search, Calendar, DollarSign } from 'lucide-react';
+import { Coffee } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { TeaSnackLog } from '../../types';
 import { createTeaSnackLog } from '../../services/firestoreService';
@@ -71,7 +71,6 @@ export const TeaSnacksPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LOG FORM */}
         <Card className="p-6 space-y-4">
           <h3 className="text-base font-extrabold text-gray-900 border-b pb-2">Log New Entry</h3>
 
@@ -131,7 +130,6 @@ export const TeaSnacksPage: React.FC = () => {
           </form>
         </Card>
 
-        {/* RECENT LOGS */}
         <Card className="p-6 space-y-4 lg:col-span-2">
           <h3 className="text-base font-extrabold text-gray-900 border-b pb-2">Recent Refreshment Logs</h3>
 
@@ -145,11 +143,11 @@ export const TeaSnacksPage: React.FC = () => {
                 <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs">
                   <div>
                     <p className="font-extrabold text-gray-900 uppercase">
-                      {log.quantity}x {log.itemType} ({formatINR(log.unitPrice)} each)
+                      {log.quantity || log.count || 1}x {log.itemType || log.type} ({formatINR(log.unitPrice || log.amount)} each)
                     </p>
-                    <p className="text-[11px] text-gray-500">By {log.loggedByName} | {log.date}</p>
+                    <p className="text-[11px] text-gray-500">By {log.loggedByName || log.loggedByUserName} | {log.date}</p>
                   </div>
-                  <span className="text-sm font-black text-brand-600 font-mono">{formatINR(log.totalPrice)}</span>
+                  <span className="text-sm font-black text-brand-600 font-mono">{formatINR(log.totalPrice || log.amount)}</span>
                 </div>
               ))}
             </div>

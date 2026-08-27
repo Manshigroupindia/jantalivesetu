@@ -4,13 +4,13 @@ import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { FileUploader } from '../common/FileUploader';
-import { UserCheck, Shield, Upload } from 'lucide-react';
+import { UserCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { saveStaffProfile, setUserDoc } from '../../services/firestoreService';
 import { generateStaffIdNumber } from '../../utils/idGenerator';
 
 export const StaffProfileWizard: React.FC = () => {
-  const { userDoc, staffProfile, refreshUserDoc } = useAuth();
+  const { userDoc, refreshUserDoc } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export const StaffProfileWizard: React.FC = () => {
     try {
       const idNumber = generateStaffIdNumber();
 
-      const profileId = await saveStaffProfile({
+      await saveStaffProfile({
         userId: userDoc.uid,
         idNumber,
         fullName,
