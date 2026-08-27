@@ -6,7 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { FileUploader } from '../../components/common/FileUploader';
-import { Receipt, Plus, Search, CheckCircle2, XCircle, DollarSign, Calendar, FileText, AlertCircle } from 'lucide-react';
+import { Receipt, Plus, Search, FileText } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { ExpenseItem } from '../../types';
 import { createExpenseItem, updateExpenseStatus } from '../../services/firestoreService';

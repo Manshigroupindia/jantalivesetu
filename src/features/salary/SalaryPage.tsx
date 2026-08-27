@@ -4,10 +4,10 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
-import { DollarSign, Calendar, Lock, CheckCircle2, FileText, Download, User } from 'lucide-react';
+import { DollarSign, Lock } from 'lucide-react';
 import { calculateSalaryBreakdown } from '../../services/salaryCalculator';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { StaffProfile, SalaryRecord, AttendanceRecord, CompanyHoliday } from '../../types';
+import { StaffProfile, AttendanceRecord, CompanyHoliday } from '../../types';
 import { formatINR } from '../../utils/formatters';
 import { formatMonthYear } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,7 +23,6 @@ export const SalaryPage: React.FC = () => {
 
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [calculating, setCalculating] = useState(false);
   const [breakdown, setBreakdown] = useState<any>(null);
 
   const { data: staffList = [], loading: staffLoading } = useRealtimeCollection<StaffProfile>('staffProfiles');

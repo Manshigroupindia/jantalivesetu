@@ -3,7 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { FileUploader } from '../../components/common/FileUploader';
-import { Settings, Lock, Building, ShieldCheck } from 'lucide-react';
+import { Settings, Lock, Building } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { setCompanySettings } from '../../services/firestoreService';
 import { setSecurityPin } from '../../services/authService';

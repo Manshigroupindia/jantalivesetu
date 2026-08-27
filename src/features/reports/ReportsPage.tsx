@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { FileBarChart, Printer, Download, Calendar, DollarSign, Clock, Receipt } from 'lucide-react';
+import { FileBarChart, Printer, DollarSign, Clock, Receipt } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AttendanceRecord, SalaryRecord, ExpenseItem } from '../../types';
 import { formatINR } from '../../utils/formatters';

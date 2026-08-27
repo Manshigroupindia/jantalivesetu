@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
 import {
   Users,
   Clock,
@@ -13,7 +12,6 @@ import {
   Coffee,
   Building,
   Sparkles,
-  AlertCircle,
   UserCheck,
   ArrowUpRight
 } from 'lucide-react';
@@ -30,7 +28,7 @@ import { getCurrentDateISO } from '../../utils/dateUtils';
 import { useNavigate } from 'react-router-dom';
 
 export const ExecutiveDashboard: React.FC = () => {
-  const { userDoc, staffProfile } = useAuth();
+  const { userDoc } = useAuth();
   const navigate = useNavigate();
   const todayStr = getCurrentDateISO();
 

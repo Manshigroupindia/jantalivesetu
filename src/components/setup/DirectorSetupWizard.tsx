@@ -4,7 +4,7 @@ import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { FileUploader } from '../common/FileUploader';
-import { Building, Lock, CheckCircle2, Shield, MapPin, Sparkles } from 'lucide-react';
+import { Building, Shield } from 'lucide-react';
 import { setCompanySettings, setUserDoc } from '../../services/firestoreService';
 import { setSecurityPin } from '../../services/authService';
 import { useAuth } from '../../contexts/AuthContext';
