@@ -8,6 +8,13 @@ export function getCurrentDateISO(): string {
   return `${year}-${month}-${day}`;
 }
 
+export function getCurrentMonthISO(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 export function getCurrentTimeFormatted(): string {
   return new Date().toLocaleTimeString('en-IN', {
     hour: '2-digit',

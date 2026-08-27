@@ -30,7 +30,7 @@ export const StaffListPage: React.FC = () => {
   const [role, setRole] = useState<UserRole>('staff');
   const [designation, setDesignation] = useState('Reporter');
   const [workingArea, setWorkingArea] = useState('New Delhi');
-  const [monthlySalary, setMonthlySalary] = useState(15000);
+  const [monthlySalary, setMonthlySalary] = useState(12000);
   const [contactNumber, setContactNumber] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

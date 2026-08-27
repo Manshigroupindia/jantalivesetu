@@ -24,9 +24,28 @@ export const StaffProfileWizard: React.FC = () => {
   const [address, setAddress] = useState('');
   const [designation, setDesignation] = useState(userDoc?.designation || 'Reporter');
   const [workingArea, setWorkingArea] = useState('New Delhi');
-  const [monthlySalary] = useState(15000);
   const [photoUrl, setPhotoUrl] = useState('');
   const [documentsUrl, setDocumentsUrl] = useState('');
+  const [existingProfile, setExistingProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!userDoc?.uid) return;
+    getStaffProfileById(userDoc.uid).then((prof) => {
+      if (prof) {
+        setExistingProfile(prof);
+        if (prof.fullName) setFullName(prof.fullName);
+        if (prof.fatherName) setFatherName(prof.fatherName);
+        if (prof.motherName) setMotherName(prof.motherName);
+        if (prof.contactNumber) setContactNumber(prof.contactNumber);
+        if (prof.emergencyContact) setEmergencyContact(prof.emergencyContact);
+        if (prof.address) setAddress(prof.address);
+        if (prof.designation) setDesignation(prof.designation);
+        if (prof.workingArea) setWorkingArea(prof.workingArea);
+        if (prof.photoUrl) setPhotoUrl(prof.photoUrl);
+        if (prof.documentsUrl) setDocumentsUrl(prof.documentsUrl);
+      }
+    });
+  }, [userDoc?.uid]);
 
   const handleSubmitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +60,8 @@ export const StaffProfileWizard: React.FC = () => {
     setError(null);
 
     try {
-      const idNumber = generateStaffIdNumber();
+      const idNumber = existingProfile?.idNumber || generateStaffIdNumber();
+      const configuredSalary = existingProfile?.monthlySalary || 12000;
 
       await saveStaffProfile({
         userId: userDoc.uid,
@@ -55,13 +75,13 @@ export const StaffProfileWizard: React.FC = () => {
         address,
         designation,
         workingArea,
-        monthlySalary,
+        monthlySalary: configuredSalary,
         photoUrl,
         documentsUrl,
         approvalStatus: 'under_review',
-        joinedDate: new Date().toISOString().split('T')[0],
-        validUpto: '31 DEC 2028',
-        createdById: userDoc.uid,
+        joinedDate: existingProfile?.joinedDate || new Date().toISOString().split('T')[0],
+        validUpto: existingProfile?.validUpto || '31 DEC 2028',
+        createdById: existingProfile?.createdById || userDoc.uid,
       });
 
       // Update User Document Status to under_review

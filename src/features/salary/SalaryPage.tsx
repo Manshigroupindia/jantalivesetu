@@ -4,7 +4,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
-import { DollarSign, Lock } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
+import { DollarSign, Lock, Edit3 } from 'lucide-react';
 import { calculateSalaryBreakdown } from '../../services/salaryCalculator';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { StaffProfile, AttendanceRecord, CompanyHoliday } from '../../types';
@@ -13,7 +14,7 @@ import { formatMonthYear } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { saveSalaryRecord } from '../../services/firestoreService';
+import { saveSalaryRecord, saveStaffProfile } from '../../services/firestoreService';
 import { logAuditEvent } from '../../services/auditService';
 
 export const SalaryPage: React.FC = () => {
@@ -24,6 +25,11 @@ export const SalaryPage: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [breakdown, setBreakdown] = useState<any>(null);
+
+  // Edit Salary Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [newSalary, setNewSalary] = useState<number>(0);
+  const [savingSalary, setSavingSalary] = useState(false);
 
   const { data: staffList = [], loading: staffLoading } = useRealtimeCollection<StaffProfile>('staffProfiles');
   const { data: attendanceLogs = [] } = useRealtimeCollection<AttendanceRecord>('attendance');
@@ -57,6 +63,52 @@ export const SalaryPage: React.FC = () => {
 
     setBreakdown(res);
   }, [selectedMonth, selectedStaffId, staffList, attendanceLogs, holidays]);
+
+  const handleOpenEditSalary = () => {
+    const staff = staffList.find((s) => s.userId === selectedStaffId);
+    if (staff) {
+      setNewSalary(staff.monthlySalary || 0);
+      setEditModalOpen(true);
+    }
+  };
+
+  const handleSaveBaseSalary = () => {
+    const staff = staffList.find((s) => s.userId === selectedStaffId);
+    if (!staff) return;
+
+    if (newSalary <= 0) {
+      alert('Please enter a valid monthly base salary greater than 0.');
+      return;
+    }
+
+    requirePinVerification(`Update Base Salary for ${staff.fullName} to ₹${newSalary}`, async () => {
+      setSavingSalary(true);
+      try {
+        await saveStaffProfile({
+          ...staff,
+          monthlySalary: newSalary,
+          updatedAt: new Date().toISOString(),
+        });
+
+        await logAuditEvent({
+          userId: userDoc?.uid || 'director',
+          userName: 'Director',
+          userRole: 'director',
+          action: 'STAFF_SALARY_UPDATED',
+          module: 'salary',
+          recordId: staff.userId,
+        });
+
+        setEditModalOpen(false);
+        alert(`Salary updated successfully for ${staff.fullName}. New Base: ₹${newSalary}`);
+      } catch (err: any) {
+        console.error('Failed to update salary:', err);
+        alert(err?.message || 'Failed to update base salary.');
+      } finally {
+        setSavingSalary(false);
+      }
+    });
+  };
 
   const handleFinalizePayroll = () => {
     if (!breakdown || !selectedStaffId) return;
@@ -101,6 +153,8 @@ export const SalaryPage: React.FC = () => {
       }
     });
   };
+
+  const selectedStaff = staffList.find((s) => s.userId === selectedStaffId);
 
   return (
     <div className="space-y-6">
@@ -159,12 +213,24 @@ export const SalaryPage: React.FC = () => {
                   Salary Slip — {formatMonthYear(selectedMonth)}
                 </h3>
                 <p className="text-xs text-gray-500 font-medium">
-                  Formula: Base Daily Rate = Monthly Salary / 30
+                  {selectedStaff ? `Employee: ${selectedStaff.fullName} (${selectedStaff.designation})` : 'Formula: Base Daily Rate = Monthly Salary / 30'}
                 </p>
               </div>
-              <Badge variant="success" size="md">
-                30-Day Basis Engine
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="success" size="md">
+                  30-Day Basis Engine
+                </Badge>
+                {isDirector && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<Edit3 className="w-4 h-4" />}
+                    onClick={handleOpenEditSalary}
+                  >
+                    Edit Salary
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
@@ -233,6 +299,47 @@ export const SalaryPage: React.FC = () => {
             )}
           </Card>
         </div>
+      )}
+
+      {/* EDIT BASE SALARY MODAL FOR DIRECTOR */}
+      {editModalOpen && selectedStaff && (
+        <Modal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          title={`Edit Base Monthly Salary — ${selectedStaff.fullName}`}
+        >
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-gray-500 font-medium">
+              Updating the base monthly salary will immediately update future monthly calculations without mutating past finalized payroll.
+            </p>
+
+            <Input
+              label="New Monthly Base Salary (₹)"
+              type="number"
+              min={1}
+              value={newSalary}
+              onChange={(e) => setNewSalary(parseInt(e.target.value, 10))}
+              required
+            />
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setEditModalOpen(false)}
+                disabled={savingSalary}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={savingSalary}
+                onClick={handleSaveBaseSalary}
+              >
+                Save Changes (PIN)
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -36,6 +36,7 @@ import { ReportsPage } from './features/reports/ReportsPage';
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { ClientDirectoryPage } from './features/clients/ClientDirectoryPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { ProfilePage } from './features/profile/ProfilePage';
 
 const DashboardResolver: React.FC = () => {
   const { userDoc } = useAuth();
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
                       <AppShell>
                         <Routes>
                           <Route path="dashboard" element={<DashboardResolver />} />
+                          <Route path="profile" element={<ProfilePage />} />
                           <Route path="work" element={<WorkAssignmentPage />} />
                           <Route path="attendance" element={<AttendancePage />} />
                           <Route path="chat" element={<ChatPage />} />

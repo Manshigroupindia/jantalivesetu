@@ -110,6 +110,23 @@ export async function createStaffAccountByDirector(data: {
 
   await setDoc(doc(db, 'users', uid), newUser);
 
+  // Create initial staffProfile doc with Director-configured monthlySalary
+  await setDoc(doc(db, 'staffProfiles', uid), {
+    userId: uid,
+    idNumber: `JLS-${Date.now().toString().slice(-4)}`,
+    fullName: data.fullName,
+    email: data.email,
+    contactNumber: data.contactNumber,
+    designation: data.designation,
+    workingArea: data.workingArea,
+    monthlySalary: data.monthlySalary,
+    approvalStatus: 'pending_profile',
+    joinedDate: new Date().toISOString().split('T')[0],
+    validUpto: '31 DEC 2028',
+    createdById: auth.currentUser?.uid || 'director',
+    createdAt: new Date().toISOString(),
+  });
+
   return { uid };
 }
 

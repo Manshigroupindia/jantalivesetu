@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getCurrentDateISO, getCurrentTimeFormatted } from '../../utils/dateUtils';
-import { Lock, Clock, ShieldCheck } from 'lucide-react';
+import { Lock, Clock, ShieldCheck, User } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {
+  const navigate = useNavigate();
   const { userDoc, staffProfile } = useAuth();
   const { lockPinSession } = useSecurity();
   const [timeStr, setTimeStr] = useState(getCurrentTimeFormatted());
@@ -48,7 +50,11 @@ export const Header: React.FC = () => {
           </Button>
         )}
 
-        <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
+        <div
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-3 pl-3 border-l border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+          title="View My Profile"
+        >
           <div className="text-right">
             <p className="text-xs font-extrabold text-gray-900 leading-tight">
               {staffProfile?.fullName || userDoc?.name || 'User'}

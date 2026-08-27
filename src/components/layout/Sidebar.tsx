@@ -20,6 +20,7 @@ import {
   Settings,
   FolderGit2,
   Lock,
+  User,
   LogOut
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -39,6 +40,7 @@ export const Sidebar: React.FC = () => {
   };
 
   const navItems = [
+    { label: 'My Profile', path: '/profile', icon: User, show: true },
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, show: can('dashboard.view') },
     { label: 'My Work', path: '/work', icon: Briefcase, show: can('work.viewOwn') },
     { label: 'Chat', path: '/chat', icon: MessageSquare, show: can('chat.use') },
