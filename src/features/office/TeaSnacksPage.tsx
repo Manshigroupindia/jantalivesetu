@@ -436,7 +436,7 @@ export const TeaSnacksPage: React.FC = () => {
           {error && (
             <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
-              Error loading records: {error.message}
+              Error loading records: {error}
             </div>
           )}
 
