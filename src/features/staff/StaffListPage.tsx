@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
-import { Users, UserPlus, Search, Eye, Trash2, RotateCcw, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Users, UserPlus, Search, Eye, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { StaffProfile, UserRole } from '../../types';
 import { createStaffAccountByDirector } from '../../services/authService';

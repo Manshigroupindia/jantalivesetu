@@ -17,6 +17,7 @@ import { db } from '../config/firebase';
 import {
   User,
   StaffProfile,
+  StaffApprovalStatus,
   CompanySettings,
   AttendanceRecord,
   WorkAssignment,
@@ -151,7 +152,7 @@ export async function softDeleteStaffProfile(userId: string, deletedBy: string, 
   }
 }
 
-export async function restoreStaffProfile(userId: string, restoredBy: string): Promise<StaffApprovalStatus> {
+export async function restoreStaffProfile(userId: string, _restoredBy: string): Promise<StaffApprovalStatus> {
   const staffProfile = await getStaffProfile(userId);
   const userDocSnap = await getDoc(doc(db, 'users', userId));
   const userDocData = userDocSnap.exists() ? (userDocSnap.data() as User) : null;

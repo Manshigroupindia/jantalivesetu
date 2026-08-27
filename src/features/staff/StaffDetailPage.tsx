@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { DigitalIdCard } from '../../components/common/DigitalIdCard';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { getStaffProfileById, saveStaffProfile, setUserDoc, softDeleteStaffProfile, deleteStaffProfile } from '../../services/firestoreService';
+import { getStaffProfileById, saveStaffProfile, setUserDoc, softDeleteStaffProfile } from '../../services/firestoreService';
 import { StaffProfile } from '../../types';
 import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { logAuditEvent } from '../../services/auditService';
