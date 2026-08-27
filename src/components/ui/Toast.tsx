@@ -17,12 +17,11 @@ export const Toast: React.FC<ToastProps> = ({
   duration = 4000,
 }) => {
   useEffect(() => {
-    if (isOpen && duration) {
-      const timer = setTimeout(() => {
-        onClose();
-      }, duration);
-      return () => clearTimeout(timer);
-    }
+    if (!isOpen || !duration) return;
+    const timer = setTimeout(() => {
+      onClose();
+    }, duration);
+    return () => clearTimeout(timer);
   }, [isOpen, duration, onClose]);
 
   if (!isOpen) return null;
@@ -33,21 +32,24 @@ export const Toast: React.FC<ToastProps> = ({
     info: <Info className="w-5 h-5 text-blue-500 shrink-0" />,
   };
 
-  const borders = {
-    success: 'border-emerald-200 bg-white text-gray-900',
-    error: 'border-red-200 bg-white text-gray-900',
-    info: 'border-blue-200 bg-white text-gray-900',
+  const bgStyles = {
+    success: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    error: 'bg-red-50 border-red-200 text-red-900',
+    info: 'bg-blue-50 border-blue-200 text-blue-900',
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 animate-in slide-in-from-bottom-5 duration-200">
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-md ${borders[type]}`}>
-        {icons[type]}
-        <p className="text-sm font-medium pr-2">{message}</p>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-0.5 rounded-lg">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+    <div
+      className={`fixed bottom-5 right-5 z-50 flex items-center gap-3 p-4 rounded-2xl border shadow-xl transition-all duration-300 transform translate-y-0 ${bgStyles[type]}`}
+    >
+      {icons[type]}
+      <p className="text-xs font-bold">{message}</p>
+      <button
+        onClick={onClose}
+        className="p-1 rounded-lg hover:bg-black/5 transition-colors text-gray-500 hover:text-gray-700"
+      >
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 };

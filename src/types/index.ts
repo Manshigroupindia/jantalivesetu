@@ -100,11 +100,13 @@ export interface WorkAssignment {
   description: string;
   assignedTo: string; // userId
   assignedToName: string;
-  createdBy: string; // userId
-  createdByName: string;
+  createdBy?: string; // userId
+  createdByName?: string;
   assignedById?: string;
-  dueDate: string; // YYYY-MM-DD
+  assignedByName?: string;
+  dueDate?: string; // YYYY-MM-DD
   deadlineDate?: string;
+  deadlineTime?: string;
   priority: WorkPriority;
   textInstructions?: string;
   voiceNoteUrl?: string;
@@ -120,7 +122,8 @@ export interface WorkAssignment {
 
 export interface ChatMessage {
   id: string;
-  chatId: string;
+  chatId?: string;
+  channel?: string;
   senderId: string;
   senderName: string;
   senderRole: UserRole;
@@ -172,7 +175,7 @@ export interface ExpenseItem {
 
 export interface TeaSnackLog {
   id: string;
-  type: 'tea' | 'snack';
+  type?: 'tea' | 'snack';
   date: string;
   count?: number;
   itemType?: string;
@@ -180,9 +183,10 @@ export interface TeaSnackLog {
   unitPrice?: number;
   totalPrice?: number;
   itemDescription?: string;
-  amount: number;
-  loggedByUserId: string;
-  loggedByUserName: string;
+  amount?: number;
+  loggedById?: string;
+  loggedByUserId?: string;
+  loggedByUserName?: string;
   loggedByName?: string;
   notes?: string;
   createdAt: string;
@@ -191,71 +195,82 @@ export interface TeaSnackLog {
 export interface WaterRecord {
   id: string;
   date: string;
-  arrived: boolean;
-  numberOfBottles: number;
+  arrived?: boolean;
+  numberOfBottles?: number;
   bottlesCount?: number;
   supplierName?: string;
-  pricePerBottle: number;
-  totalCost: number;
-  loggedByUserId: string;
-  loggedByUserName: string;
+  pricePerBottle?: number;
+  bottlePrice?: number;
+  totalCost?: number;
+  receiptPhotoUrl?: string;
+  loggedById?: string;
+  loggedByUserId?: string;
+  loggedByUserName?: string;
   loggedByName?: string;
-  status: 'unpaid' | 'paid';
+  status?: 'unpaid' | 'paid';
   paidAt?: string;
   note?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface ElectricityRecord {
   id: string;
   date: string;
-  previousReading: number;
-  currentReading: number;
-  unitsConsumed: number;
-  ratePerUnit: number;
+  previousReading?: number;
+  currentReading?: number;
+  unitsConsumed?: number;
+  ratePerUnit?: number;
   unitRate?: number;
-  totalAmount: number;
-  loggedByUserId: string;
-  loggedByUserName: string;
+  totalAmount?: number;
+  meterPhotoUrl?: string;
+  notes?: string;
+  loggedById?: string;
+  loggedByUserId?: string;
+  loggedByUserName?: string;
   loggedByName?: string;
-  status: 'pending' | 'paid';
+  status?: 'pending' | 'paid';
   paidAt?: string;
   paidBy?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface OfficeRentRecord {
   id: string;
   month: string;
   rentAmount: number;
-  dueDate: string;
+  dueDate?: string;
   landlordName?: string;
   paymentMode?: string;
   transactionRef?: string;
-  status: 'pending' | 'paid';
+  receiptUrl?: string;
+  loggedById?: string;
+  loggedByName?: string;
+  status?: 'pending' | 'paid';
   paymentDate?: string;
   notes?: string;
   paidBy?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface CleaningRecord {
   id: string;
-  type: 'office' | 'toilet';
-  month: string;
+  type?: 'office' | 'toilet';
+  month?: string;
   date?: string;
   cleaningArea?: string;
   cleanerName: string;
   amountPaid: number;
-  status: 'pending' | 'paid';
-  paymentDate?: string;
+  inspectionPhotoUrl?: string;
+  loggedById?: string;
   loggedByName?: string;
+  status?: 'pending' | 'paid';
+  paymentDate?: string;
   notes?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface SalaryCalculationResult {
