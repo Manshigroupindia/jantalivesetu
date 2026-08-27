@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { ZoomIn, ZoomOut, RotateCcw, Crop, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Crop } from 'lucide-react';
+import { cropImageToBlob } from '../../utils/cropImage';
 
 interface ImageCropperModalProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface ImageCropperModalProps {
   onCropComplete: (croppedBlob: Blob, croppedPreviewUrl: string) => void;
 }
 
+const VIEWPORT_SIZE = 280; // Size of crop square in pixels
+
 export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   isOpen,
   imageFile,
@@ -17,6 +20,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   onCropComplete,
 }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -24,12 +29,12 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   const [processing, setProcessing] = useState(false);
 
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Load image when file changes
+  // Load image & determine natural dimensions
   useEffect(() => {
     if (!imageFile) {
       setImageSrc(null);
+      setNaturalSize(null);
       return;
     }
 
@@ -38,12 +43,33 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
 
+    const img = new Image();
+    img.onload = () => {
+      setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = objectUrl;
+
     return () => {
       URL.revokeObjectURL(objectUrl);
     };
   }, [imageFile]);
 
-  if (!isOpen || !imageFile || !imageSrc) return null;
+  if (!isOpen || !imageFile || !imageSrc || !naturalSize) return null;
+
+  // Calculate scales and boundaries
+  const baseScale = Math.max(VIEWPORT_SIZE / naturalSize.width, VIEWPORT_SIZE / naturalSize.height);
+  const totalScale = baseScale * zoom;
+
+  const renderedWidth = naturalSize.width * totalScale;
+  const renderedHeight = naturalSize.height * totalScale;
+
+  const maxPanX = Math.max(0, (renderedWidth - VIEWPORT_SIZE) / 2);
+  const maxPanY = Math.max(0, (renderedHeight - VIEWPORT_SIZE) / 2);
+
+  const clampPan = (x: number, y: number) => ({
+    x: Math.max(-maxPanX, Math.min(maxPanX, x)),
+    y: Math.max(-maxPanY, Math.min(maxPanY, y)),
+  });
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -52,10 +78,9 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
+    const newPanX = e.clientX - dragStart.x;
+    const newPanY = e.clientY - dragStart.y;
+    setPan(clampPan(newPanX, newPanY));
   };
 
   const handleMouseUp = () => {
@@ -71,10 +96,9 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || e.touches.length !== 1) return;
-    setPan({
-      x: e.touches[0].clientX - dragStart.x,
-      y: e.touches[0].clientY - dragStart.y,
-    });
+    const newPanX = e.touches[0].clientX - dragStart.x;
+    const newPanY = e.touches[0].clientY - dragStart.y;
+    setPan(clampPan(newPanX, newPanY));
   };
 
   const handleTouchEnd = () => {
@@ -87,69 +111,24 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   };
 
   const handleCrop = async () => {
-    if (!imageRef.current) return;
+    if (!imageRef.current || !naturalSize) return;
     setProcessing(true);
 
     try {
-      const img = imageRef.current;
-      const exportCanvas = document.createElement('canvas');
-      const exportSize = 512; // 512x512 high quality square crop
-      exportCanvas.width = exportSize;
-      exportCanvas.height = exportSize;
-      const ctx = exportCanvas.getContext('2d');
+      const croppedBlob = await cropImageToBlob(imageRef.current, {
+        naturalWidth: naturalSize.width,
+        naturalHeight: naturalSize.height,
+        viewportSize: VIEWPORT_SIZE,
+        zoom,
+        panX: pan.x,
+        panY: pan.y,
+        exportSize: 512,
+      });
 
-      if (!ctx) {
-        throw new Error('Failed to get canvas context');
-      }
-
-      // Calculate source crop area based on zoom & pan
-      const viewSize = 280; // Size of the crop container box in UI
-      const baseScale = Math.max(viewSize / img.naturalWidth, viewSize / img.naturalHeight);
-      const totalScale = baseScale * zoom;
-
-      const renderedWidth = img.naturalWidth * totalScale;
-      const renderedHeight = img.naturalHeight * totalScale;
-
-      // Position of center of crop box relative to image center
-      const imgCenterX = renderedWidth / 2 + pan.x;
-      const imgCenterY = renderedHeight / 2 + pan.y;
-
-      const cropSourceSize = viewSize / totalScale;
-      const sourceX = (img.naturalWidth / 2) - (imgCenterX - viewSize / 2) / totalScale;
-      const sourceY = (img.naturalHeight / 2) - (imgCenterY - viewSize / 2) / totalScale;
-
-      // Fill background with white
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, exportSize, exportSize);
-
-      ctx.drawImage(
-        img,
-        sourceX,
-        sourceY,
-        cropSourceSize,
-        cropSourceSize,
-        0,
-        0,
-        exportSize,
-        exportSize
-      );
-
-      exportCanvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            alert('Unable to process this image. Please try another image.');
-            setProcessing(false);
-            return;
-          }
-
-          const previewUrl = URL.createObjectURL(blob);
-          onCropComplete(blob, previewUrl);
-          setProcessing(false);
-          onClose();
-        },
-        'image/jpeg',
-        0.92
-      );
+      const previewUrl = URL.createObjectURL(croppedBlob);
+      onCropComplete(croppedBlob, previewUrl);
+      setProcessing(false);
+      onClose();
     } catch (err) {
       console.error('Crop error:', err);
       alert('Unable to process this image. Please try another image.');
@@ -158,15 +137,14 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crop Profile Photo (1:1 Aspect Ratio)">
+    <Modal isOpen={isOpen} onClose={onClose} title="Crop Profile Photo (1:1 Square)">
       <div className="space-y-4 py-2">
         <p className="text-xs text-gray-500 font-medium">
-          Drag to position and use the zoom slider to adjust your profile photo crop.
+          Drag to align your face inside the circle. Adjust zoom using the slider.
         </p>
 
         {/* CROP CONTAINER VIEWPORT */}
         <div
-          ref={containerRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -174,24 +152,28 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className="relative w-[280px] h-[280px] mx-auto bg-gray-900 rounded-3xl overflow-hidden cursor-grab active:cursor-grabbing border-4 border-brand-500 shadow-xl touch-none flex items-center justify-center select-none"
+          className="relative w-[280px] h-[280px] mx-auto bg-black rounded-3xl overflow-hidden cursor-grab active:cursor-grabbing border-4 border-brand-500 shadow-xl touch-none select-none"
         >
           <img
             ref={imageRef}
             src={imageSrc}
-            alt="Crop candidate"
+            alt="Crop target"
             draggable={false}
             style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-              maxHeight: '100%',
-              maxWidth: '100%',
-              objectFit: 'contain',
+              width: `${renderedWidth}px`,
+              height: `${renderedHeight}px`,
+              maxWidth: 'none',
+              maxHeight: 'none',
+              position: 'absolute',
+              left: `${(VIEWPORT_SIZE - renderedWidth) / 2}px`,
+              top: `${(VIEWPORT_SIZE - renderedHeight) / 2}px`,
+              transform: `translate(${pan.x}px, ${pan.y}px)`,
+              transition: isDragging ? 'none' : 'transform 0.05s ease-out',
             }}
           />
 
-          {/* OVERLAY MASK GUIDE */}
-          <div className="absolute inset-0 border-2 border-white/40 rounded-full pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" />
+          {/* CIRCULAR / SQUARE OVERLAY MASK */}
+          <div className="absolute inset-0 border-2 border-white/60 rounded-full pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
         </div>
 
         {/* CONTROLS */}
@@ -204,7 +186,21 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
               max="3"
               step="0.05"
               value={zoom}
-              onChange={(e) => setZoom(parseFloat(e.target.value))}
+              onChange={(e) => {
+                const newZoom = parseFloat(e.target.value);
+                setZoom(newZoom);
+
+                // Re-clamp pan for new zoom level
+                const newTotalScale = baseScale * newZoom;
+                const newRW = naturalSize.width * newTotalScale;
+                const newRH = naturalSize.height * newTotalScale;
+                const newMaxPanX = Math.max(0, (newRW - VIEWPORT_SIZE) / 2);
+                const newMaxPanY = Math.max(0, (newRH - VIEWPORT_SIZE) / 2);
+                setPan((prev) => ({
+                  x: Math.max(-newMaxPanX, Math.min(newMaxPanX, prev.x)),
+                  y: Math.max(-newMaxPanY, Math.min(newMaxPanY, prev.y)),
+                }));
+              }}
               className="w-full accent-brand-600 h-1.5 bg-gray-200 rounded-lg cursor-pointer"
             />
             <ZoomIn className="w-4 h-4 text-gray-500 shrink-0" />
