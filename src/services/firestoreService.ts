@@ -79,11 +79,13 @@ export async function setCompanySettings(settings: Partial<CompanySettings>): Pr
   await setDoc(docRef, { ...settings, updatedAt: new Date().toISOString() }, { merge: true });
 }
 
-// Staff Profiles
 export async function getStaffProfile(profileId: string): Promise<StaffProfile | null> {
   const docRef = doc(db, 'staffProfiles', profileId);
   const snap = await getDoc(docRef);
-  return snap.exists() ? ({ id: snap.id, ...snap.data() } as StaffProfile) : null;
+  if (snap.exists()) {
+    return { id: snap.id, ...snap.data() } as StaffProfile;
+  }
+  return getStaffProfileByUserId(profileId);
 }
 
 export const getStaffProfileById = getStaffProfile;
@@ -99,18 +101,28 @@ export async function getStaffProfileByUserId(userId: string): Promise<StaffProf
 }
 
 export async function saveStaffProfile(profile: Partial<StaffProfile>): Promise<string> {
-  if (profile.id) {
-    const docRef = doc(db, 'staffProfiles', profile.id);
-    await updateDoc(docRef, { ...profile, updatedAt: new Date().toISOString() });
-    return profile.id;
-  } else {
-    const docRef = await addDoc(collection(db, 'staffProfiles'), {
-      ...profile,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    return docRef.id;
+  const targetId = profile.userId || profile.id;
+  if (!targetId) {
+    throw new Error('Cannot save staff profile: missing canonical userId / profile.id');
   }
+
+  const docRef = doc(db, 'staffProfiles', targetId);
+  await setDoc(
+    docRef,
+    {
+      id: targetId,
+      userId: targetId,
+      ...profile,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+  return targetId;
+}
+
+export async function deleteStaffProfile(userId: string): Promise<void> {
+  await deleteDoc(doc(db, 'staffProfiles', userId));
+  await deleteDoc(doc(db, 'users', userId));
 }
 
 // Attendance

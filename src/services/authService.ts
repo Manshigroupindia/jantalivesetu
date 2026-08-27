@@ -88,15 +88,33 @@ export async function createStaffAccountByDirector(data: {
   fullName: string;
   contactNumber: string;
 }): Promise<{ uid: string }> {
-  // Create user in Firebase Auth
-  const credential = await createUserWithEmailAndPassword(auth, data.email, data.temporaryPass);
-  const uid = credential.user.uid;
+  const normalizedEmail = data.email.trim().toLowerCase();
+
+  // Check email uniqueness in Firestore users collection
+  const { collection, query, where, getDocs } = await import('firebase/firestore');
+  const q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    throw new Error(`This email (${normalizedEmail}) is already assigned to a staff account.`);
+  }
+
+  let uid: string;
+  try {
+    // Create user in Firebase Auth
+    const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, data.temporaryPass);
+    uid = credential.user.uid;
+  } catch (authErr: any) {
+    if (authErr.code === 'auth/email-already-in-use') {
+      throw new Error(`This email (${normalizedEmail}) is already registered in Firebase Authentication.`);
+    }
+    throw authErr;
+  }
 
   const pinHash = simpleHashPin(data.pin);
 
   const newUser: User = {
     uid,
-    email: data.email,
+    email: normalizedEmail,
     role: data.role,
     approved: false,
     status: 'pending_profile',
@@ -112,10 +130,11 @@ export async function createStaffAccountByDirector(data: {
 
   // Create initial staffProfile doc with Director-configured monthlySalary
   await setDoc(doc(db, 'staffProfiles', uid), {
+    id: uid,
     userId: uid,
     idNumber: `JLS-${Date.now().toString().slice(-4)}`,
     fullName: data.fullName,
-    email: data.email,
+    email: normalizedEmail,
     contactNumber: data.contactNumber,
     designation: data.designation,
     workingArea: data.workingArea,

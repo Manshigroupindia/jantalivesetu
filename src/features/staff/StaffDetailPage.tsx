@@ -4,12 +4,13 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
 import { DigitalIdCard } from '../../components/common/DigitalIdCard';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { getStaffProfileById, saveStaffProfile, setUserDoc } from '../../services/firestoreService';
+import { getStaffProfileById, saveStaffProfile, setUserDoc, deleteStaffProfile } from '../../services/firestoreService';
 import { StaffProfile } from '../../types';
-import { ArrowLeft, CheckCircle2, XCircle, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -29,6 +30,14 @@ export const StaffDetailPage: React.FC = () => {
   const [salary, setSalary] = useState<number>(0);
   const [designation, setDesignation] = useState('');
   const [workingArea, setWorkingArea] = useState('');
+
+  // Rejection Modal State
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  // Delete Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -86,6 +95,45 @@ export const StaffDetailPage: React.FC = () => {
     });
   };
 
+  const handleRejectStaff = () => {
+    if (!rejectionReason.trim()) {
+      alert('Please enter a rejection reason for the staff member.');
+      return;
+    }
+
+    requirePinVerification('Reject Staff Profile', async () => {
+      setUpdating(true);
+      try {
+        await saveStaffProfile({
+          ...staff,
+          approvalStatus: 'rejected',
+          rejectionReason: rejectionReason.trim(),
+        });
+        await setUserDoc(staff.userId, { status: 'rejected', approved: false });
+
+        await logAuditEvent({
+          userId: currentUser?.uid || 'director',
+          userName: 'Director',
+          userRole: 'director',
+          action: 'STAFF_REJECTED',
+          module: 'staff',
+          recordId: staff.userId,
+        });
+
+        setStaff((prev) =>
+          prev ? { ...prev, approvalStatus: 'rejected', rejectionReason: rejectionReason.trim() } : null
+        );
+        setRejectModalOpen(false);
+        setRejectionReason('');
+        alert('Staff profile rejected. Staff member can resubmit profile.');
+      } catch (err: any) {
+        alert('Failed to reject staff profile.');
+      } finally {
+        setUpdating(false);
+      }
+    });
+  };
+
   const handleSuspendStaff = () => {
     requirePinVerification('Suspend Staff Member Account', async () => {
       setUpdating(true);
@@ -106,6 +154,64 @@ export const StaffDetailPage: React.FC = () => {
         alert('Staff profile suspended.');
       } catch (err: any) {
         alert('Failed to suspend staff.');
+      } finally {
+        setUpdating(false);
+      }
+    });
+  };
+
+  const handleReactivateStaff = () => {
+    requirePinVerification('Reactivate Staff Member Account', async () => {
+      setUpdating(true);
+      try {
+        await saveStaffProfile({ ...staff, approvalStatus: 'approved' });
+        await setUserDoc(staff.userId, { status: 'approved', approved: true });
+
+        await logAuditEvent({
+          userId: currentUser?.uid || 'director',
+          userName: 'Director',
+          userRole: 'director',
+          action: 'STAFF_REACTIVATED',
+          module: 'staff',
+          recordId: staff.userId,
+        });
+
+        setStaff((prev) => (prev ? { ...prev, approvalStatus: 'approved' } : null));
+        alert('Staff account reactivated successfully.');
+      } catch (err: any) {
+        alert('Failed to reactivate staff account.');
+      } finally {
+        setUpdating(false);
+      }
+    });
+  };
+
+  const handlePermanentDeleteStaff = () => {
+    if (deleteConfirmText.trim() !== 'DELETE') {
+      alert('Please type DELETE to confirm permanent deletion.');
+      return;
+    }
+
+    requirePinVerification('PERMANENTLY DELETE STAFF ACCOUNT', async () => {
+      setUpdating(true);
+      try {
+        await deleteStaffProfile(staff.userId);
+
+        await logAuditEvent({
+          userId: currentUser?.uid || 'director',
+          userName: 'Director',
+          userRole: 'director',
+          action: 'STAFF_PERMANENTLY_DELETED',
+          module: 'staff',
+          recordId: staff.userId,
+        });
+
+        setDeleteModalOpen(false);
+        alert(`Staff account for ${staff.fullName} has been permanently deleted.`);
+        navigate('/staff');
+      } catch (err: any) {
+        console.error('Delete staff error:', err);
+        alert('Failed to delete staff account. Check security permissions.');
       } finally {
         setUpdating(false);
       }
@@ -155,7 +261,7 @@ export const StaffDetailPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* ID CARD MODAL OR SECTION */}
+      {/* ID CARD SECTION */}
       {showIdCard && (
         <Card className="p-6 bg-gray-50 flex items-center justify-center border-gray-200">
           <DigitalIdCard staff={staff} company={companySettings} />
@@ -189,9 +295,9 @@ export const StaffDetailPage: React.FC = () => {
                   : 'danger'
               }
               size="md"
-              className="mt-2"
+              className="mt-2 uppercase font-black"
             >
-              {staff.approvalStatus.toUpperCase()}
+              {staff.approvalStatus}
             </Badge>
           </div>
 
@@ -207,7 +313,7 @@ export const StaffDetailPage: React.FC = () => {
           </div>
 
           {/* ACTIONS */}
-          <div className="space-y-2 pt-2">
+          <div className="space-y-2 pt-2 border-t border-gray-100">
             {staff.approvalStatus !== 'approved' && (
               <Button
                 variant="primary"
@@ -218,6 +324,18 @@ export const StaffDetailPage: React.FC = () => {
                 onClick={handleApproveStaff}
               >
                 Approve & Activate Staff
+              </Button>
+            )}
+
+            {staff.approvalStatus === 'under_review' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                icon={<XCircle className="w-4 h-4" />}
+                onClick={() => setRejectModalOpen(true)}
+              >
+                Reject Profile Submission
               </Button>
             )}
 
@@ -233,6 +351,32 @@ export const StaffDetailPage: React.FC = () => {
                 Suspend Staff Account
               </Button>
             )}
+
+            {staff.approvalStatus === 'suspended' && (
+              <Button
+                variant="primary"
+                size="sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                icon={<RefreshCw className="w-4 h-4" />}
+                loading={updating}
+                onClick={handleReactivateStaff}
+              >
+                Reactivate Staff Account
+              </Button>
+            )}
+
+            {/* PERMANENT DELETE STAFF ACTION */}
+            <div className="pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs font-bold text-red-600 hover:bg-red-50"
+                icon={<Trash2 className="w-3.5 h-3.5 text-red-600" />}
+                onClick={() => setDeleteModalOpen(true)}
+              >
+                Delete Staff Permanently
+              </Button>
+            </div>
           </div>
         </Card>
 
@@ -317,6 +461,85 @@ export const StaffDetailPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* REJECT MODAL */}
+      <Modal isOpen={rejectModalOpen} onClose={() => setRejectModalOpen(false)} title="Reject Staff Profile">
+        <div className="space-y-4 py-2">
+          <p className="text-xs text-gray-600">
+            Specify reason for rejecting <strong>{staff.fullName}</strong>'s profile submission. The staff member will see this feedback upon login.
+          </p>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-700 block">Rejection Reason / Required Fixes</label>
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Please re-upload clearer ID documents or correct address."
+              className="w-full text-xs p-3 border rounded-xl border-gray-200 focus:outline-none focus:border-brand-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => setRejectModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={updating}
+              onClick={handleRejectStaff}
+            >
+              Confirm Rejection & Request Changes
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* DELETE MODAL */}
+      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Permanently Delete Staff Record?">
+        <div className="space-y-4 py-2">
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-2">
+            <div className="flex items-center gap-2 font-black text-red-900 text-sm">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <span>DANGER: Irreversible Action</span>
+            </div>
+            <p>
+              You are about to permanently delete staff member <strong>{staff.fullName}</strong> (ID: <span className="font-mono">{staff.idNumber}</span>, Email: {staff.email}).
+            </p>
+            <p className="text-[11px] text-red-700">
+              This will permanently delete the staff profile and account credentials. Historical accounting and audit records will remain preserved for audit compliance.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-700 block">
+              Type <span className="font-mono text-red-600">DELETE</span> to confirm permanent deletion:
+            </label>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE"
+              required
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={updating}
+              disabled={deleteConfirmText.trim() !== 'DELETE'}
+              onClick={handlePermanentDeleteStaff}
+            >
+              Confirm Permanent Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

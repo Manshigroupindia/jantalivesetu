@@ -203,8 +203,8 @@ export const StaffProfileWizard: React.FC = () => {
 
           {error && <p className="text-xs text-red-600 font-medium text-center">{error}</p>}
 
-          <Button type="submit" variant="primary" className="w-full" loading={loading}>
-            Submit Profile for Director Approval
+          <Button type="submit" variant="primary" className="w-full" loading={loading} disabled={loading}>
+            {loading ? 'Submitting Profile...' : 'Submit Profile for Director Approval'}
           </Button>
 
           <p className="text-[11px] text-gray-400 font-medium text-center">Secure with Janta Live Setu</p>

@@ -77,16 +77,30 @@ export const StaffListPage: React.FC = () => {
     }
   };
 
-  const filteredStaff = staffList.filter((s) => {
-    const matchesSearch =
-      s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.workingArea.toLowerCase().includes(searchTerm.toLowerCase());
+    // Deduplicate by canonical userId / profile ID
+    const uniqueStaffMap = new Map<string, StaffProfile>();
+    staffList.forEach((s) => {
+      const key = s.userId || s.id;
+      if (!uniqueStaffMap.has(key)) {
+        uniqueStaffMap.set(key, s);
+      } else {
+        const existing = uniqueStaffMap.get(key)!;
+        if (s.approvalStatus !== 'pending_profile' && existing.approvalStatus === 'pending_profile') {
+          uniqueStaffMap.set(key, s);
+        }
+      }
+    });
 
-    const matchesStatus = statusFilter === 'all' || s.approvalStatus === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+    const filteredStaff = Array.from(uniqueStaffMap.values()).filter((s) => {
+      const matchesSearch =
+        s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.workingArea.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus = statusFilter === 'all' || s.approvalStatus === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
 
   return (
     <div className="space-y-6">
