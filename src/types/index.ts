@@ -22,6 +22,14 @@ export interface User {
   name?: string;
   designation?: string;
   photoUrl?: string;
+  phone?: string;
+  altPhone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  bio?: string;
   createdAt: string;
   updatedAt: string;
 }
