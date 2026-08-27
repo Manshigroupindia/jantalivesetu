@@ -1,197 +1,355 @@
-export type UserRole = 'SUPER_ADMIN' | 'MANAGE' | 'VIEW';
+// Comprehensive TypeScript Interfaces for Janta Live Setu
 
-export interface EntityPermissions {
-  view: boolean;
-  add: boolean;
-  edit: boolean;
-  delete: boolean;
+export type UserRole = 'director' | 'admin' | 'staff';
+
+export type StaffApprovalStatus = 'pending_profile' | 'under_review' | 'approved' | 'rejected' | 'suspended' | 'deactivated';
+
+export interface LocationRecord {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  capturedAt: string;
 }
 
-export interface CustomPermissions {
-  websites: EntityPermissions;
-  gmail: EntityPermissions;
-  hosting: EntityPermissions;
-  social: EntityPermissions;
-  categories: EntityPermissions;
-  employees: EntityPermissions;
-}
-
-export interface UserProfile {
+export interface User {
   uid: string;
   email: string;
-  displayName: string;
   role: UserRole;
-  employeeId?: string;
-  phone?: string;
-  photoURL?: string;
-  profileImage?: string;
-  department?: string;
-  status: 'Active' | 'Inactive';
-  permissions?: CustomPermissions;
-  accessPinHash?: string;
-  accessPinEnabled?: boolean;
-  accessPinUpdatedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  approved: boolean;
+  status: StaffApprovalStatus;
+  firstLoginCompleted: boolean;
+  pinHash?: string;
+  name?: string;
+  designation?: string;
+  photoUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface Employee {
+export interface StaffProfile {
   id: string;
-  employeeId: string;
-  employeeName: string;
+  userId: string;
+  idNumber: string; // e.g., JL-STAFF-2026-0001
+  fullName: string;
+  fatherName: string;
+  motherName: string;
   email: string;
-  phone: string;
-  role: UserRole;
-  status: 'Active' | 'Inactive';
-  department: string;
-  notes?: string;
-  profileImage?: string;
-  permissions: CustomPermissions;
-  accessPinHash?: string;
-  accessPinEnabled?: boolean;
-  accessPinUpdatedAt?: string;
-  uid?: string;
+  contactNumber: string;
+  emergencyContact: string;
+  address: string;
+  designation: string;
+  workingArea: string;
+  monthlySalary: number; // in INR (stored in whole numbers or paise)
+  photoUrl: string;
+  documentsUrl?: string; // merged PDF or compressed docs
+  offerLetterUrl?: string;
+  approvalStatus: StaffApprovalStatus;
+  rejectionReason?: string;
+  joinedDate: string;
+  validUpto: string;
+  createdById: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface WebsiteClientData {
-  id: string;
-  srNo: number;
-  clientName: string;
-  websiteName: string;
-  categoryId: string;
-  categoryName?: string;
-  domain: string;
-  domainPurchaseDate: string; // YYYY-MM-DD
-  domainExpiryDate: string;   // YYYY-MM-DD
-  domainBuyPlatform: string;  // e.g. Domain India, GoDaddy, Namecheap, etc.
-  domainBuyCard: string;      // ONLY last 4 digits, e.g. "**** 4821"
-  hostingApp: string;
-  phoneNumber: string;
-  emailId: string;
-  contactPersonName: string;
-  websiteStatus: 'Complete' | 'Uncomplete';
-  websiteLink: string;
-  websiteAdminUserId: string;
-  websiteAdminPassword: string;
-  paymentMethod: 'Cash' | 'Online' | 'RTGS' | 'NEFT' | 'UPI';
-  paymentStatus: 'Paid' | 'Pending';
-  active: 'Active' | 'Inactive';
-  renewDate: string;
-  feedback: string;
-  hostingId: string;
-  hostingPassword: string;
-  logoUrl?: string;
-  additionalNotes?: string;
-  createdAt: string;
+export interface CompanySettings {
+  companyName: string;
+  logoUrl: string;
+  deityImageUrl?: string;
+  headOfficeAddress: string;
+  officeLocationName: string;
+  latitude: number;
+  longitude: number;
+  googleMapsUrl: string;
+  websiteUrl: string;
+  helplineNumber: string;
+  phoneNumbers: string[];
+  emailAddresses: string[];
+  teaUnitPrice: number;
+  waterBottlePrice: number;
+  electricityUnitRate: number;
+  electricityPreviousReading: number;
+  isSetupCompleted: boolean;
+  setupCompleted?: boolean;
+  setupCompletedAt?: string;
   updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
 }
 
-export interface Category {
+export interface AttendanceRecord {
   id: string;
-  name: string;
+  userId: string;
+  userName: string;
+  userDesignation: string;
+  date: string; // YYYY-MM-DD
+  checkIn: string; // HH:mm AM/PM
+  checkOut?: string;
+  checkInLocation: LocationRecord;
+  checkOutLocation?: LocationRecord;
+  totalMinutes: number;
+  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'paid_leave';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type WorkPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type WorkStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed';
+
+export interface WorkAssignment {
+  id: string;
+  title: string;
+  description: string;
+  assignedTo: string; // userId
+  assignedToName: string;
+  createdBy: string; // userId
+  createdByName: string;
+  dueDate: string; // YYYY-MM-DD
+  priority: WorkPriority;
+  textInstructions?: string;
+  voiceNoteUrl?: string;
+  imageUrl?: string;
+  attachmentUrl?: string;
+  status: WorkStatus;
+  staffNotes?: string;
+  staffProofUrl?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  text?: string;
+  imageUrl?: string;
+  audioUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  read: boolean;
+  timestamp: string;
+}
+
+export interface ChatRoom {
+  id: string;
+  participants: string[]; // userIds
+  participantNames: Record<string, string>;
+  lastMessage?: string;
+  lastMessageTimestamp?: string;
+  unreadCounts: Record<string, number>;
+  updatedAt: string;
+}
+
+export type ExpenseCategory = 'travel' | 'office_supplies' | 'client_meeting' | 'food' | 'maintenance' | 'other';
+export type ExpenseStatus = 'pending' | 'approved' | 'paid' | 'rejected';
+
+export interface ExpenseItem {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number; // in INR
+  title: string;
+  category: ExpenseCategory;
+  date: string; // YYYY-MM-DD
   description?: string;
-  color?: string;
-  icon?: string;
-  order: number;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface GmailAccount {
-  id: string;
-  accountName: string;
-  gmailAddress: string;
-  password: string;
-  recoveryEmail: string;
-  recoveryPhone: string;
-  purpose: string;
-  ownerClient: string;
-  notes?: string;
-  status: 'Active' | 'Inactive';
+  receiptUrl?: string;
+  paymentMethod?: string;
+  status: ExpenseStatus;
+  paidAmount?: number;
+  paidBy?: string;
+  paidAt?: string;
+  paymentReference?: string;
   createdAt: string;
   updatedAt: string;
-  createdBy: string;
 }
 
-export interface PlatformAccount {
+export interface TeaSnackLog {
   id: string;
-  platformName: string;
-  platformType: string;
-  loginId: string;
-  password: string;
-  panelUrl: string;
+  type: 'tea' | 'snack';
+  date: string;
+  count?: number;
+  itemDescription?: string;
+  amount: number;
+  loggedByUserId: string;
+  loggedByUserName: string;
   notes?: string;
-  status: 'Active' | 'Inactive';
+  createdAt: string;
+}
+
+export interface WaterRecord {
+  id: string;
+  date: string;
+  arrived: boolean;
+  numberOfBottles: number;
+  pricePerBottle: number;
+  totalCost: number;
+  loggedByUserId: string;
+  loggedByUserName: string;
+  status: 'unpaid' | 'paid';
+  paidAt?: string;
+  note?: string;
   createdAt: string;
   updatedAt: string;
-  createdBy: string;
 }
 
-export interface SocialAccount {
+export interface ElectricityRecord {
   id: string;
-  platform: 'Facebook' | 'Instagram' | 'YouTube' | 'LinkedIn' | 'X' | 'Pinterest' | 'Telegram' | 'WhatsApp Business' | 'Other';
-  accountName: string;
-  usernameEmail: string;
-  password: string;
-  profileUrl: string;
-  phone?: string;
-  ownerClient: string;
-  notes?: string;
-  status: 'Active' | 'Inactive';
+  date: string;
+  previousReading: number;
+  currentReading: number;
+  unitsConsumed: number;
+  ratePerUnit: number;
+  totalAmount: number;
+  loggedByUserId: string;
+  loggedByUserName: string;
+  status: 'pending' | 'paid';
+  paidAt?: string;
+  paidBy?: string;
   createdAt: string;
   updatedAt: string;
-  createdBy: string;
 }
 
-export type AuditAction = 
-  | 'LOGIN'
-  | 'LOGOUT'
-  | 'CREATE'
-  | 'UPDATE'
-  | 'DELETE'
-  | 'VIEW_SENSITIVE_DATA'
-  | 'REVEAL_PASSWORD'
-  | 'ROLE_CHANGE'
-  | 'EMPLOYEE_CREATED'
-  | 'EMPLOYEE_UPDATED'
-  | 'EMPLOYEE_DELETED'
-  | 'ACCESS_PIN_CREATED'
-  | 'ACCESS_PIN_CHANGED'
-  | 'ACCESS_PIN_RESET'
-  | 'ACCESS_PIN_DISABLED'
-  | 'ACCESS_PIN_VERIFICATION_FAILED'
-  | 'ACCESS_PIN_VERIFICATION_SUCCESS'
-  | 'DELETE_VERIFIED';
+export interface OfficeRentRecord {
+  id: string;
+  month: string;
+  rentAmount: number;
+  dueDate: string;
+  status: 'pending' | 'paid';
+  paymentDate?: string;
+  notes?: string;
+  paidBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CleaningRecord {
+  id: string;
+  type: 'office' | 'toilet';
+  month: string;
+  cleanerName: string;
+  amountPaid: number;
+  status: 'pending' | 'paid';
+  paymentDate?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalaryCalculationResult {
+  userId: string;
+  month: string; // YYYY-MM
+  monthlyBaseSalary: number; // 30-day basis
+  dailyRate: number; // baseSalary / 30
+  daysInMonth: number;
+  workedDays: number;
+  paidSundays: number;
+  paidHolidays: number;
+  emergencyLeavesUsed: number;
+  unpaidLeaves: number;
+  deductedDays: number;
+  salaryDeductionAmount: number;
+  earnedSalary: number;
+  expenseReimbursements: number;
+  finalTotalPayable: number;
+
+  // Aliases
+  baseSalary?: number;
+  totalDaysInMonth?: number;
+  presentDays?: number;
+  sundaysCount?: number;
+  paidHolidaysCount?: number;
+  emergencyLeaveCount?: number;
+  absentDays?: number;
+  totalPayableDays?: number;
+  grossSalary?: number;
+  absentDeduction?: number;
+  advanceDeduction?: number;
+  netSalary?: number;
+}
+
+export interface SalaryRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  userDesignation?: string;
+  month: string; // YYYY-MM
+  baseSalary?: number;
+  dailyRate?: number;
+  totalMonthDays?: number;
+  presentDays?: number;
+  sundaysCount?: number;
+  paidHolidaysCount?: number;
+  emergencyLeaveCount?: number;
+  absentDays?: number;
+  payableDays?: number;
+  grossSalary?: number;
+  advanceDeduction?: number;
+  netSalary?: number;
+  calculation?: SalaryCalculationResult;
+  status: 'draft' | 'finalized' | 'paid';
+  paidSalaryAmount?: number;
+  paidExpenseAmount?: number;
+  totalPaid?: number;
+  paidAt?: string;
+  paidBy?: string;
+  paymentMethod?: string;
+  transactionReference?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt: string;
+}
+
+export type NoticePriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface Notice {
+  id: string;
+  title: string;
+  description: string;
+  date: string; // YYYY-MM-DD
+  priority: NoticePriority;
+  imageUrl?: string;
+  attachmentUrl?: string;
+  expiryDate?: string;
+  isPinned: boolean;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface CompanyHoliday {
+  id: string;
+  holidayName: string;
+  date: string; // YYYY-MM-DD
+  type?: 'national' | 'festival' | 'company';
+  isPaid?: boolean;
+  description?: string;
+  createdAt: string;
+}
 
 export interface AuditLog {
   id: string;
   userId: string;
   userName: string;
-  userRole?: string;
-  action: AuditAction;
-  collection: string;
-  recordId: string;
-  details?: string;
+  userRole: UserRole;
+  action: string;
+  module: string;
+  recordId?: string;
+  previousValue?: string;
+  newValue?: string;
   timestamp: string;
-  metadata?: Record<string, any>;
 }
 
-export interface SystemSettings {
-  companyName: string;
-  companyLogo?: string;
-  defaultPaginationSize: number;
-  accessPasswordHash: string;
-  securityNotice?: string;
-  updatedAt?: string;
-}
-
-export interface DomainExpiryFilter {
-  purchaseMonth?: number;
-  purchaseYear?: number;
-  expiryMonth?: number;
-  expiryYear?: number;
+export interface ClientRecord {
+  id: string;
+  clientName: string;
+  companyName?: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  address?: string;
+  gstNumber?: string;
+  status?: 'active' | 'upcoming';
+  notes?: string;
+  createdById?: string;
+  createdAt: string;
 }

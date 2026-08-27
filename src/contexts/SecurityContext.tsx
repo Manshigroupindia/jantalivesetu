@@ -1,97 +1,95 @@
-import React, { createContext, useContext, useState, useRef } from 'react';
-import { verifyAccessPassword } from '../firebase/services/settingsService';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { logAuditEvent } from '../firebase/services/auditService';
 
 interface SecurityContextType {
-  isVerified: boolean;
-  requestSecurityVerification: (onSuccess: () => void, title?: string, description?: string) => void;
-  verifyEnteredPassword: (password: string) => Promise<boolean>;
-  modalOpen: boolean;
-  modalTitle: string;
-  modalDescription: string;
-  closeModal: () => void;
+  isPinLocked: boolean;
+  lockPinSession: () => void;
+  unlockPinSession: () => void;
+  requirePinVerification: (actionName: string, onVerified: () => void) => void;
+  requireReauthVerification: (actionName: string, onVerified: () => void) => void;
+  activeActionName: string | null;
+  pendingCallback: (() => void) | null;
+  cancelSecurityVerification: () => void;
+  pinModalOpen: boolean;
+  reauthModalOpen: boolean;
 }
 
-const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
+const SecurityContext = createContext<SecurityContextType>({
+  isPinLocked: false,
+  lockPinSession: () => {},
+  unlockPinSession: () => {},
+  requirePinVerification: () => {},
+  requireReauthVerification: () => {},
+  activeActionName: null,
+  pendingCallback: null,
+  cancelSecurityVerification: () => {},
+  pinModalOpen: false,
+  reauthModalOpen: false,
+});
 
 export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { profile } = useAuth();
-  const [isVerified, setIsVerified] = useState<boolean>(false);
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [modalTitle, setModalTitle] = useState<string>('Security Access Required');
-  const [modalDescription, setModalDescription] = useState<string>(
-    'Please enter the Website Access Password to perform this sensitive action.'
-  );
+  const { userDoc } = useAuth();
+  const [isPinLocked, setIsPinLocked] = useState<boolean>(false);
+  const [pinModalOpen, setPinModalOpen] = useState<boolean>(false);
+  const [reauthModalOpen, setReauthModalOpen] = useState<boolean>(false);
+  const [activeActionName, setActiveActionName] = useState<string | null>(null);
+  const [pendingCallback, setPendingCallback] = useState<(() => void) | null>(null);
 
-  const pendingActionRef = useRef<(() => void) | null>(null);
-  const verifyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Tab switch & background inactivity detector
+  useEffect(() => {
+    if (!userDoc || !userDoc.pinHash) return;
 
-  const grantTemporarySession = () => {
-    setIsVerified(true);
-    if (verifyTimerRef.current) clearTimeout(verifyTimerRef.current);
-    
-    // Auto lock verified session after 60 seconds
-    verifyTimerRef.current = setTimeout(() => {
-      setIsVerified(false);
-    }, 60000);
-  };
-
-  const requestSecurityVerification = (onSuccess: () => void, title?: string, description?: string) => {
-    if (isVerified) {
-      onSuccess();
-      return;
-    }
-    
-    pendingActionRef.current = onSuccess;
-    if (title) setModalTitle(title);
-    if (description) setModalDescription(description);
-    setModalOpen(true);
-  };
-
-  const verifyEnteredPassword = async (enteredPassword: string): Promise<boolean> => {
-    const valid = await verifyAccessPassword(enteredPassword);
-    if (valid) {
-      grantTemporarySession();
-      setModalOpen(false);
-
-      if (profile) {
-        await logAuditEvent(
-          profile.uid,
-          profile.displayName,
-          profile.role,
-          'VIEW_SENSITIVE_DATA',
-          'security',
-          'access_verification',
-          'Access password verified'
-        );
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // When tab is hidden/switched away, lock PIN session according to security policy
+        setIsPinLocked(true);
       }
+    };
 
-      if (pendingActionRef.current) {
-        const action = pendingActionRef.current;
-        pendingActionRef.current = null;
-        action();
-      }
-      return true;
-    }
-    return false;
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userDoc]);
+
+  const lockPinSession = () => setIsPinLocked(true);
+  const unlockPinSession = () => {
+    setIsPinLocked(false);
+    setPinModalOpen(false);
   };
 
-  const closeModal = () => {
-    setModalOpen(false);
-    pendingActionRef.current = null;
+  const requirePinVerification = (actionName: string, onVerified: () => void) => {
+    setActiveActionName(actionName);
+    setPendingCallback(() => onVerified);
+    setPinModalOpen(true);
+  };
+
+  const requireReauthVerification = (actionName: string, onVerified: () => void) => {
+    setActiveActionName(actionName);
+    setPendingCallback(() => onVerified);
+    setReauthModalOpen(true);
+  };
+
+  const cancelSecurityVerification = () => {
+    setPinModalOpen(false);
+    setReauthModalOpen(false);
+    setActiveActionName(null);
+    setPendingCallback(null);
   };
 
   return (
     <SecurityContext.Provider
       value={{
-        isVerified,
-        requestSecurityVerification,
-        verifyEnteredPassword,
-        modalOpen,
-        modalTitle,
-        modalDescription,
-        closeModal,
+        isPinLocked,
+        lockPinSession,
+        unlockPinSession,
+        requirePinVerification,
+        requireReauthVerification,
+        activeActionName,
+        pendingCallback,
+        cancelSecurityVerification,
+        pinModalOpen,
+        reauthModalOpen,
       }}
     >
       {children}
@@ -99,10 +97,4 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 };
 
-export const useSecurity = (): SecurityContextType => {
-  const context = useContext(SecurityContext);
-  if (!context) {
-    throw new Error('useSecurity must be used within a SecurityProvider');
-  }
-  return context;
-};
+export const useSecurity = () => useContext(SecurityContext);

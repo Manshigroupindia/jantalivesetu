@@ -1,0 +1,143 @@
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const crypto = require("crypto");
+
+admin.initializeApp();
+const db = admin.firestore();
+
+// Helper to hash 4-digit PIN securely
+function hashPin(pin, salt = "janta_live_setu_secure_salt_2026") {
+  return crypto.createHmac("sha256", salt).update(String(pin)).digest("hex");
+}
+
+/**
+ * Callable Function: Set custom user role claims securely
+ */
+exports.setUserRole = functions.https.onCall(async (data, context) => {
+  // Enforce caller is authenticated Director
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  }
+  const callerUid = context.auth.uid;
+  const callerDoc = await db.collection("users").doc(callerUid).get();
+  
+  if (!callerDoc.exists || (callerDoc.data().role !== "director" && context.auth.token.email !== "devenjhaofficial@gmail.com")) {
+    throw new functions.https.HttpsError("permission-denied", "Only Director can change user roles.");
+  }
+
+  const { targetUid, role } = data;
+  if (!targetUid || !["director", "admin", "staff"].includes(role)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid targetUid or role.");
+  }
+
+  // Set Firebase Custom Claims
+  await admin.auth().setCustomUserClaims(targetUid, { role });
+  await db.collection("users").doc(targetUid).update({
+    role,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  return { success: true, message: `Role updated to ${role}` };
+});
+
+/**
+ * Callable Function: Verify Director/Staff Security PIN server-side
+ */
+exports.verifyPin = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const { pin } = data;
+  if (!pin || String(pin).length !== 4) {
+    throw new functions.https.HttpsError("invalid-argument", "PIN must be exactly 4 digits.");
+  }
+
+  const uid = context.auth.uid;
+  const userDoc = await db.collection("users").doc(uid).get();
+
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "User account record not found.");
+  }
+
+  const storedHashedPin = userDoc.data().pinHash;
+  const incomingHash = hashPin(pin);
+
+  if (storedHashedPin !== incomingHash) {
+    return { valid: false, message: "Incorrect security PIN." };
+  }
+
+  return { valid: true };
+});
+
+/**
+ * Callable Function: Finalize Payroll securely
+ */
+exports.finalizePayroll = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!callerDoc.exists || (callerDoc.data().role !== "director" && callerDoc.data().role !== "admin")) {
+    throw new functions.https.HttpsError("permission-denied", "Only Director/Admin can finalize payroll.");
+  }
+
+  const { month, records, pin } = data;
+  
+  // Verify PIN first
+  const storedHashedPin = callerDoc.data().pinHash;
+  if (storedHashedPin && storedHashedPin !== hashPin(pin)) {
+    throw new functions.https.HttpsError("permission-denied", "Invalid PIN authorization.");
+  }
+
+  const batch = db.batch();
+  for (const record of records) {
+    const docRef = db.collection("salaryRecords").doc(`${record.userId}_${month}`);
+    batch.set(docRef, {
+      ...record,
+      status: "finalized",
+      finalizedBy: context.auth.uid,
+      finalizedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
+
+  await batch.commit();
+  return { success: true, count: records.length };
+});
+
+/**
+ * Callable Function: Permanent Delete with Re-authentication & PIN
+ */
+exports.permanentDeleteRecord = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!callerDoc.exists || callerDoc.data().role !== "director") {
+    throw new functions.https.HttpsError("permission-denied", "Only Director can permanently delete records.");
+  }
+
+  const { collectionName, documentId, pin } = data;
+
+  const storedHashedPin = callerDoc.data().pinHash;
+  if (storedHashedPin && storedHashedPin !== hashPin(pin)) {
+    throw new functions.https.HttpsError("permission-denied", "Invalid security PIN.");
+  }
+
+  // Perform permanent deletion
+  await db.collection(collectionName).doc(documentId).delete();
+
+  // Create audit log
+  await db.collection("auditLogs").add({
+    userId: context.auth.uid,
+    userName: callerDoc.data().name || "Director",
+    action: "PERMANENT_DELETE",
+    module: collectionName,
+    recordId: documentId,
+    timestamp: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  return { success: true };
+});

@@ -1,191 +1,109 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CompanyProvider } from './contexts/CompanyContext';
 import { SecurityProvider } from './contexts/SecurityContext';
-import { NotificationProvider } from './contexts/NotificationContext';
 
-// Pages
-import { LoginPage } from './pages/LoginPage';
-import { SecurityVerificationPage } from './pages/SecurityVerificationPage';
-import { DashboardHome } from './pages/DashboardHome';
-import { WebsitesPage } from './pages/WebsitesPage';
-import { WebsiteFormPage } from './pages/WebsiteFormPage';
-import { WebsiteDetailPage } from './pages/WebsiteDetailPage';
-import { CategoriesPage } from './pages/CategoriesPage';
-import { GmailAccountsPage } from './pages/GmailAccountsPage';
-import { PlatformsPage } from './pages/PlatformsPage';
-import { SocialMediaPage } from './pages/SocialMediaPage';
-import { EmployeesPage } from './pages/EmployeesPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { SettingsPage } from './pages/SettingsPage';
-import { AuditLogsPage } from './pages/AuditLogsPage';
-import { AccessSecurityPage } from './pages/AccessSecurityPage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ProtectedRoute } from './components/security/ProtectedRoute';
+import { AppShell } from './components/layout/AppShell';
 
-// Protected Route Guard Component (Requires both Firebase Auth + Security PIN Verification)
-const ProtectedRoute: React.FC<{ children: React.ReactNode; requireSuperAdmin?: boolean }> = ({
-  children,
-  requireSuperAdmin = false,
-}) => {
-  const { currentUser, securityVerified, isSuperAdmin, loading } = useAuth();
+import { LoginPage } from './features/auth/LoginPage';
+import { DirectorSetupWizard } from './components/setup/DirectorSetupWizard';
+import { StaffProfileWizard } from './components/setup/StaffProfileWizard';
+import { PendingApprovalPage } from './features/auth/PendingApprovalPage';
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-xs font-semibold">
-        Loading Application Security Context...
-      </div>
-    );
+import { ExecutiveDashboard } from './features/dashboard/ExecutiveDashboard';
+import { StaffDashboard } from './features/dashboard/StaffDashboard';
+
+import { WorkAssignmentPage } from './features/work/WorkAssignmentPage';
+import { AttendancePage } from './features/attendance/AttendancePage';
+import { ChatPage } from './features/chat/ChatPage';
+import { ExpensesPage } from './features/expenses/ExpensesPage';
+import { SalaryPage } from './features/salary/SalaryPage';
+import { StaffListPage } from './features/staff/StaffListPage';
+import { StaffDetailPage } from './features/staff/StaffDetailPage';
+
+import { TeaSnacksPage } from './features/office/TeaSnacksPage';
+import { WaterRecordPage } from './features/office/WaterRecordPage';
+import { ElectricityRecordPage } from './features/office/ElectricityRecordPage';
+import { OfficeRentPage } from './features/office/OfficeRentPage';
+import { OfficeCleanlinessPage } from './features/office/OfficeCleanlinessPage';
+
+import { NoticeBoardPage } from './features/notices/NoticeBoardPage';
+import { HolidayCalendarPage } from './features/notices/HolidayCalendarPage';
+import { ReportsPage } from './features/reports/ReportsPage';
+import { AuditLogsPage } from './features/audit/AuditLogsPage';
+import { ClientDirectoryPage } from './features/clients/ClientDirectoryPage';
+import { SettingsPage } from './features/settings/SettingsPage';
+
+const DashboardResolver: React.FC = () => {
+  const { userDoc } = useAuth();
+  if (userDoc?.role === 'director') {
+    return <ExecutiveDashboard />;
   }
-
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!securityVerified) {
-    return <Navigate to="/security-verification" replace />;
-  }
-
-  if (requireSuperAdmin && !isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return <>{children}</>;
+  return <StaffDashboard />;
 };
 
-export function App() {
+export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <SecurityProvider>
-          <NotificationProvider>
-            <Routes>
-              {/* Login Page (Step 1) */}
-              <Route path="/login" element={<LoginPage />} />
+    <ErrorBoundary>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AuthProvider>
+          <CompanyProvider>
+            <SecurityProvider>
+              <Routes>
+                {/* AUTH ROUTES */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
-              {/* 2-Step Security Verification Page (Step 2) */}
-              <Route path="/security-verification" element={<SecurityVerificationPage />} />
+                {/* SETUP WIZARDS */}
+                <Route path="/setup/director" element={<DirectorSetupWizard />} />
+                <Route path="/setup/staff" element={<StaffProfileWizard />} />
 
-              {/* Protected Workspace Routes */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <DashboardHome />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/websites"
-                element={
-                  <ProtectedRoute>
-                    <WebsitesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/websites/new"
-                element={
-                  <ProtectedRoute>
-                    <WebsiteFormPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/websites/:id"
-                element={
-                  <ProtectedRoute>
-                    <WebsiteDetailPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/websites/:id/edit"
-                element={
-                  <ProtectedRoute>
-                    <WebsiteFormPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/categories"
-                element={
-                  <ProtectedRoute>
-                    <CategoriesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/gmail"
-                element={
-                  <ProtectedRoute>
-                    <GmailAccountsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/platforms"
-                element={
-                  <ProtectedRoute>
-                    <PlatformsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/social"
-                element={
-                  <ProtectedRoute>
-                    <SocialMediaPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/employees"
-                element={
-                  <ProtectedRoute requireSuperAdmin>
-                    <EmployeesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/access-security"
-                element={
-                  <ProtectedRoute requireSuperAdmin>
-                    <AccessSecurityPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <SettingsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/audit-logs"
-                element={
-                  <ProtectedRoute>
-                    <AuditLogsPage />
-                  </ProtectedRoute>
-                }
-              />
+                {/* PROTECTED CMS APP SHELL ROUTES */}
+                <Route
+                  path="/*"
+                  element={
+                    <ProtectedRoute>
+                      <AppShell>
+                        <Routes>
+                          <Route path="dashboard" element={<DashboardResolver />} />
+                          <Route path="work" element={<WorkAssignmentPage />} />
+                          <Route path="attendance" element={<AttendancePage />} />
+                          <Route path="chat" element={<ChatPage />} />
+                          <Route path="expenses" element={<ExpensesPage />} />
+                          <Route path="salary" element={<SalaryPage />} />
+                          <Route path="staff" element={<StaffListPage />} />
+                          <Route path="staff/:id" element={<StaffDetailPage />} />
 
-              {/* Catch-all Fallback */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </NotificationProvider>
-        </SecurityProvider>
-      </AuthProvider>
-    </BrowserRouter>
+                          <Route path="tea-snacks" element={<TeaSnacksPage />} />
+                          <Route path="water" element={<WaterRecordPage />} />
+                          <Route path="electricity" element={<ElectricityRecordPage />} />
+                          <Route path="office/rent" element={<OfficeRentPage />} />
+                          <Route path="office/cleanliness" element={<OfficeCleanlinessPage />} />
+                          <Route path="office/toilet-cleaning" element={<OfficeCleanlinessPage />} />
+
+                          <Route path="notices" element={<NoticeBoardPage />} />
+                          <Route path="holidays" element={<HolidayCalendarPage />} />
+                          <Route path="reports" element={<ReportsPage />} />
+                          <Route path="audit" element={<AuditLogsPage />} />
+                          <Route path="clients" element={<ClientDirectoryPage />} />
+                          <Route path="settings" element={<SettingsPage />} />
+
+                          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                        </Routes>
+                      </AppShell>
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </SecurityProvider>
+          </CompanyProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
-}
+};
 
 export default App;

@@ -1,38 +1,37 @@
 import React from 'react';
-import { Database, Plus } from 'lucide-react';
+import { Inbox } from 'lucide-react';
+import { Button } from '../ui/Button';
 
-interface EmptyStateProps {
-  title?: string;
-  description?: string;
+export interface EmptyStateProps {
+  title: string;
+  description: string;
   icon?: React.ReactNode;
-  actionText?: string;
+  actionLabel?: string;
   onAction?: () => void;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  title = 'No records found',
-  description = 'There are no items matching your criteria at this time.',
+  title,
+  description,
   icon,
-  actionText,
+  actionLabel,
   onAction,
 }) => {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-12 text-center max-w-lg mx-auto my-6 shadow-xs">
-      <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center mx-auto mb-4">
-        {icon || <Database className="w-6 h-6 text-slate-400" />}
+    <div className="bg-white rounded-2xl border border-gray-100 p-8 sm:p-12 text-center space-y-3 shadow-sm max-w-lg mx-auto my-6">
+      <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 text-gray-400 flex items-center justify-center mx-auto shadow-inner">
+        {icon || <Inbox className="w-7 h-7" />}
       </div>
-      <h3 className="text-base font-semibold text-slate-900 mb-1">{title}</h3>
-      <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6 leading-relaxed">{description}</p>
-
-      {actionText && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{actionText}</span>
-        </button>
+      <div>
+        <h3 className="text-base font-bold text-gray-900">{title}</h3>
+        <p className="text-xs text-gray-500 max-w-sm mx-auto mt-1 leading-relaxed">{description}</p>
+      </div>
+      {actionLabel && onAction && (
+        <div className="pt-2">
+          <Button variant="primary" size="sm" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        </div>
       )}
     </div>
   );

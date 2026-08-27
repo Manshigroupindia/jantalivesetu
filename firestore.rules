@@ -6,86 +6,170 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-
+    
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-
-    function isSuperAdmin() {
+    
+    function isDirector() {
       return isAuthenticated() && (
-        request.auth.token.email == 'devenjhaofficial@gmail.com' ||
-        getUserData().role == 'SUPER_ADMIN'
+        request.auth.token.email == 'devenjhaofficial@gmail.com' || 
+        getUserData().role == 'director'
       );
     }
-
-    function isManageUser() {
+    
+    function isAdmin() {
       return isAuthenticated() && (
-        isSuperAdmin() ||
-        getUserData().role == 'MANAGE'
+        isDirector() || getUserData().role == 'admin'
       );
     }
-
-    function isViewUser() {
-      return isAuthenticated();
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isApproved() {
+      return isAuthenticated() && getUserData().approved == true;
     }
 
-    // User & Employee profile rules
+    // USERS COLLECTION
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || request.auth.uid == userId;
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isDirector() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'approved']));
+      allow delete: if isDirector();
     }
 
-    match /employees/{employeeId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
-    }
-
-    // Websites collection
-    match /websites/{websiteId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isManageUser();
-      allow delete: if isSuperAdmin();
-    }
-
-    // Categories collection
-    match /categories/{categoryId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isManageUser();
-      allow delete: if isSuperAdmin();
-    }
-
-    // Gmail Accounts collection
-    match /gmailAccounts/{accountId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isManageUser();
-      allow delete: if isSuperAdmin();
-    }
-
-    // Hosting & Platform Accounts
-    match /platformAccounts/{accountId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isManageUser();
-      allow delete: if isSuperAdmin();
-    }
-
-    // Social Media Accounts
-    match /socialAccounts/{accountId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isManageUser();
-      allow delete: if isSuperAdmin();
-    }
-
-    // Audit logs
-    match /auditLogs/{logId} {
+    // STAFF PROFILES
+    match /staffProfiles/{profileId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isSuperAdmin();
+      allow update: if isDirector() || isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isDirector();
     }
 
-    // App Settings
-    match /settings/{settingId} {
+    // COMPANY SETTINGS
+    match /companySettings/{docId} {
+      allow read: if true;
+      allow write: if isDirector();
+    }
+
+    // ATTENDANCE
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDirector() || (isAuthenticated() && resource.data.userId == request.auth.uid && resource.data.checkOut == null);
+      allow delete: if isDirector();
+    }
+
+    // WORK ASSIGNMENTS
+    match /workAssignments/{workId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.assignedTo == request.auth.uid || resource.data.createdBy == request.auth.uid);
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.assignedTo == request.auth.uid);
+      allow delete: if isDirector();
+    }
+
+    // CHATS & MESSAGES
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.participants.hasAny([request.auth.uid]));
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.participants.hasAny([request.auth.uid]));
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+        allow update: if isAuthenticated() && resource.data.senderId == request.auth.uid;
+        allow delete: if isDirector();
+      }
+    }
+
+    // EXPENSES
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid && resource.data.status == 'pending');
+      allow delete: if isDirector();
+    }
+
+    // TEA RECORDS
+    match /teaRecords/{teaId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow create: if isAuthenticated() && isApproved();
+      allow update: if isAuthenticated() && isApproved();
+      allow delete: if isDirector();
+    }
+
+    // WATER RECORDS
+    match /waterRecords/{waterId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isApproved();
+      allow update: if isAuthenticated() && isApproved();
+      allow delete: if isDirector();
+    }
+
+    // ELECTRICITY RECORDS
+    match /electricityRecords/{elecId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isApproved();
+      allow update: if isDirector();
+      allow delete: if isDirector();
+    }
+
+    // RENT RECORDS
+    match /officeRentRecords/{rentId} {
+      allow read: if isAuthenticated();
+      allow create: if isDirector();
+      allow update: if isDirector();
+      allow delete: if isDirector();
+    }
+
+    // CLEANING RECORDS
+    match /cleaningRecords/{cleanId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isDirector();
+      allow delete: if isDirector();
+    }
+
+    // SALARY RECORDS
+    match /salaryRecords/{salaryId} {
+      allow read: if isAuthenticated() && (isDirector() || resource.data.userId == request.auth.uid);
+      allow create: if isDirector();
+      allow update: if isDirector();
+      allow delete: if isDirector();
+    }
+
+    // NOTICES
+    match /notices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow create: if isDirector() || isAdmin();
+      allow update: if isDirector() || isAdmin();
+      allow delete: if isDirector();
+    }
+
+    // HOLIDAYS
+    match /holidays/{holidayId} {
+      allow read: if isAuthenticated();
+      allow create: if isDirector();
+      allow update: if isDirector();
+      allow delete: if isDirector();
+    }
+
+    // CLIENTS
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isApproved();
+      allow update: if isAuthenticated() && isApproved();
+      allow delete: if isDirector();
+    }
+
+    // AUDIT LOGS
+    match /auditLogs/{logId} {
+      allow read: if isDirector();
+      allow create: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
