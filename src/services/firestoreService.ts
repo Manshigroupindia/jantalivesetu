@@ -205,6 +205,22 @@ export async function createTeaSnackLog(log: Omit<TeaSnackLog, 'id'>): Promise<s
   return docRef.id;
 }
 
+export async function updateTeaSnackLog(
+  logId: string,
+  updates: Partial<TeaSnackLog>
+): Promise<void> {
+  const docRef = doc(db, 'teaSnackLogs', logId);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function deleteTeaSnackLog(logId: string): Promise<void> {
+  const docRef = doc(db, 'teaSnackLogs', logId);
+  await deleteDoc(docRef);
+}
+
 // Water Records
 export async function createWaterRecord(record: Omit<WaterRecord, 'id'>): Promise<string> {
   const docRef = await addDoc(collection(db, 'waterRecords'), record);

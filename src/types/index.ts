@@ -191,6 +191,17 @@ export interface TeaSnackLog {
   loggedByName?: string;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
+  updatedById?: string;
+  updatedByName?: string;
+  updateReason?: string;
+  previousValues?: {
+    itemType?: string;
+    quantity?: number;
+    unitPrice?: number;
+    totalPrice?: number;
+    notes?: string;
+  };
 }
 
 export interface WaterRecord {
