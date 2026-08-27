@@ -7,18 +7,11 @@ import { ImageCropperModal } from '../../components/common/ImageCropperModal';
 import { DigitalIdCard } from '../../components/common/DigitalIdCard';
 import {
   User as UserIcon,
-  Phone,
-  Mail,
-  MapPin,
-  Briefcase,
   Shield,
   FileText,
   Edit3,
-  CheckCircle2,
   Lock,
-  Camera,
-  RotateCcw,
-  Building
+  Camera
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -206,6 +199,7 @@ export const ProfilePage: React.FC = () => {
       } else {
         // Save Staff Profile to staffProfiles collection
         const updatedProfileData: StaffProfile = {
+          id: profile?.id || userDoc.uid,
           userId: userDoc.uid,
           idNumber: profile?.idNumber || `JLS-${userDoc.uid.slice(0, 5).toUpperCase()}`,
           fullName,
@@ -221,9 +215,11 @@ export const ProfilePage: React.FC = () => {
           photoUrl: finalPhotoUrl,
           documentsUrl: profile?.documentsUrl || '',
           approvalStatus: profile?.approvalStatus || 'approved',
-          joinedDate: profile?.joinedDate || userDoc.createdAt.split('T')[0],
+          joinedDate: profile?.joinedDate || (userDoc.createdAt ? userDoc.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
           validUpto: profile?.validUpto || '31 DEC 2028',
           createdById: profile?.createdById || userDoc.uid,
+          createdAt: profile?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
 
         await saveStaffProfile(updatedProfileData);
@@ -303,6 +299,7 @@ export const ProfilePage: React.FC = () => {
           <DigitalIdCard
             staff={
               profile || {
+                id: userDoc.uid,
                 userId: userDoc.uid,
                 idNumber: `JLS-${userDoc.uid.slice(0, 5).toUpperCase()}`,
                 fullName: userDoc.name || 'User',
@@ -317,9 +314,11 @@ export const ProfilePage: React.FC = () => {
                 monthlySalary: 12000,
                 photoUrl: activeAvatarSrc,
                 approvalStatus: 'approved',
-                joinedDate: userDoc.createdAt.split('T')[0],
+                joinedDate: userDoc.createdAt ? userDoc.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
                 validUpto: '31 DEC 2028',
                 createdById: userDoc.uid,
+                createdAt: userDoc.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
               }
             }
             company={companySettings}

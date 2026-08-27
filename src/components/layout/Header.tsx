@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getCurrentDateISO, getCurrentTimeFormatted } from '../../utils/dateUtils';
-import { Lock, Clock, ShieldCheck, User } from 'lucide-react';
+import { Lock, Clock, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {

@@ -33,11 +33,11 @@ import {
   ClientRecord
 } from '../types';
 
-// Realtime Collection Subscription Helper
 export function subscribeToCollection<T>(
   collectionName: string,
   constraints: QueryConstraint[],
-  onUpdate: (data: T[]) => void
+  onUpdate: (data: T[]) => void,
+  onError?: (err: Error) => void
 ) {
   const q = query(collection(db, collectionName), ...constraints);
   return onSnapshot(
@@ -51,6 +51,7 @@ export function subscribeToCollection<T>(
     },
     (err) => {
       console.error(`Error subscribing to ${collectionName}:`, err);
+      if (onError) onError(err);
     }
   );
 }

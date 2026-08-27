@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Clock, ShieldCheck, LogOut, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Clock, ShieldCheck, LogOut, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOutUser } from '../../services/authService';
 

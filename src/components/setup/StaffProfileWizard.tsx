@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
@@ -6,8 +6,9 @@ import { Button } from '../ui/Button';
 import { FileUploader } from '../common/FileUploader';
 import { UserCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { saveStaffProfile, setUserDoc } from '../../services/firestoreService';
+import { saveStaffProfile, setUserDoc, getStaffProfileById } from '../../services/firestoreService';
 import { generateStaffIdNumber } from '../../utils/idGenerator';
+import { StaffProfile } from '../../types';
 
 export const StaffProfileWizard: React.FC = () => {
   const { userDoc, refreshUserDoc } = useAuth();
@@ -26,11 +27,11 @@ export const StaffProfileWizard: React.FC = () => {
   const [workingArea, setWorkingArea] = useState('New Delhi');
   const [photoUrl, setPhotoUrl] = useState('');
   const [documentsUrl, setDocumentsUrl] = useState('');
-  const [existingProfile, setExistingProfile] = useState<any>(null);
+  const [existingProfile, setExistingProfile] = useState<StaffProfile | null>(null);
 
   useEffect(() => {
     if (!userDoc?.uid) return;
-    getStaffProfileById(userDoc.uid).then((prof) => {
+    getStaffProfileById(userDoc.uid).then((prof: StaffProfile | null) => {
       if (prof) {
         setExistingProfile(prof);
         if (prof.fullName) setFullName(prof.fullName);
