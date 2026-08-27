@@ -14,13 +14,13 @@ service cloud.firestore {
     function isDirector() {
       return isAuthenticated() && (
         request.auth.token.email == 'devenjhaofficial@gmail.com' || 
-        getUserData().role == 'director'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'director')
       );
     }
     
     function isAdmin() {
       return isAuthenticated() && (
-        isDirector() || getUserData().role == 'admin'
+        isDirector() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin')
       );
     }
     

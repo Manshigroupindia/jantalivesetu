@@ -123,22 +123,41 @@ export async function saveStaffProfile(profile: Partial<StaffProfile>): Promise<
 }
 
 export async function softDeleteStaffProfile(userId: string, deletedBy: string, reason?: string): Promise<void> {
+  if (!userId) {
+    throw new Error('Staff ID is required for deletion.');
+  }
+  if (userId === deletedBy) {
+    throw new Error('Director account cannot be deleted from Staff Management.');
+  }
+
   const staffProfile = await getStaffProfile(userId);
   const userDocSnap = await getDoc(doc(db, 'users', userId));
   const userDocData = userDocSnap.exists() ? (userDocSnap.data() as User) : null;
 
+  if (userDocData?.role === 'director') {
+    throw new Error('Director account cannot be deleted from Staff Management.');
+  }
+
+  if (staffProfile?.approvalStatus === 'deleted' || userDocData?.status === 'deleted') {
+    throw new Error('This staff account is already in the Bin.');
+  }
+
   const currentStatus = staffProfile?.approvalStatus || userDocData?.status || 'approved';
   const now = new Date().toISOString();
 
-  await updateDoc(doc(db, 'users', userId), {
-    status: 'deleted',
-    approved: false,
-    deletedAt: now,
-    deletedBy,
-    previousStatus: currentStatus,
-    deletionReason: reason || '',
-    updatedAt: now,
-  });
+  await setDoc(
+    doc(db, 'users', userId),
+    {
+      status: 'deleted',
+      approved: false,
+      deletedAt: now,
+      deletedBy,
+      previousStatus: currentStatus,
+      deletionReason: reason || '',
+      updatedAt: now,
+    },
+    { merge: true }
+  );
 
   if (staffProfile) {
     await saveStaffProfile({
@@ -153,6 +172,10 @@ export async function softDeleteStaffProfile(userId: string, deletedBy: string, 
 }
 
 export async function restoreStaffProfile(userId: string, _restoredBy: string): Promise<StaffApprovalStatus> {
+  if (!userId) {
+    throw new Error('Staff ID is required for restoration.');
+  }
+
   const staffProfile = await getStaffProfile(userId);
   const userDocSnap = await getDoc(doc(db, 'users', userId));
   const userDocData = userDocSnap.exists() ? (userDocSnap.data() as User) : null;
@@ -161,14 +184,18 @@ export async function restoreStaffProfile(userId: string, _restoredBy: string): 
   const isApproved = (prevStatus === 'approved' || prevStatus === 'active');
   const now = new Date().toISOString();
 
-  await updateDoc(doc(db, 'users', userId), {
-    status: prevStatus,
-    approved: isApproved,
-    deletedAt: null,
-    deletedBy: null,
-    deletionReason: null,
-    updatedAt: now,
-  });
+  await setDoc(
+    doc(db, 'users', userId),
+    {
+      status: prevStatus,
+      approved: isApproved,
+      deletedAt: null,
+      deletedBy: null,
+      deletionReason: null,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
 
   if (staffProfile) {
     await saveStaffProfile({

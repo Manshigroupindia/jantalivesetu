@@ -187,6 +187,11 @@ export const StaffDetailPage: React.FC = () => {
   };
 
   const handleSoftDeleteStaff = () => {
+    if (!staff) return;
+    if (currentUser && staff.userId === currentUser.uid) {
+      alert('Director account cannot be deleted from Staff Management.');
+      return;
+    }
     if (deleteConfirmText.trim() !== 'DELETE') {
       alert('Please type DELETE to confirm moving staff record to Bin.');
       return;
@@ -211,7 +216,7 @@ export const StaffDetailPage: React.FC = () => {
         navigate('/staff');
       } catch (err: any) {
         console.error('Delete staff error:', err);
-        alert('Failed to delete staff account. Check security permissions.');
+        alert(err.message || 'Failed to delete staff account. Check security permissions.');
       } finally {
         setUpdating(false);
       }
