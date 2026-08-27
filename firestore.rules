@@ -92,11 +92,19 @@ service cloud.firestore {
       allow delete: if isDirector();
     }
 
-    // TEA RECORDS
+    // TEA & SNACKS LOGS
+    match /teaSnackLogs/{teaId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isDirector();
+    }
+
+    // TEA RECORDS (ALIAS)
     match /teaRecords/{teaId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isApproved();
-      allow update: if isAuthenticated() && isApproved();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if isDirector();
     }
 
