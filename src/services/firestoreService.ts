@@ -119,6 +119,16 @@ export async function saveStaffProfile(profile: Partial<StaffProfile>): Promise<
     },
     { merge: true }
   );
+
+  // If there was an old document with profile.id != targetId, clean it up to maintain single canonical UID identity
+  if (profile.id && profile.id !== targetId) {
+    try {
+      await deleteDoc(doc(db, 'staffProfiles', profile.id));
+    } catch (err) {
+      console.warn('Could not remove legacy duplicate staff profile doc:', err);
+    }
+  }
+
   return targetId;
 }
 
@@ -138,13 +148,18 @@ export async function softDeleteStaffProfile(userId: string, deletedBy: string, 
     throw new Error('Director account cannot be deleted from Staff Management.');
   }
 
-  if (staffProfile?.approvalStatus === 'deleted' || userDocData?.status === 'deleted') {
+  const isAlreadyDeleted =
+    staffProfile?.approvalStatus?.toLowerCase() === 'deleted' ||
+    userDocData?.status?.toLowerCase() === 'deleted';
+
+  if (isAlreadyDeleted) {
     throw new Error('This staff account is already in the Bin.');
   }
 
   const currentStatus = staffProfile?.approvalStatus || userDocData?.status || 'approved';
   const now = new Date().toISOString();
 
+  // 1. Update users/{userId} document in Firestore
   await setDoc(
     doc(db, 'users', userId),
     {
@@ -159,19 +174,48 @@ export async function softDeleteStaffProfile(userId: string, deletedBy: string, 
     { merge: true }
   );
 
+  // 2. Update staffProfiles/{userId} document in Firestore (creating canonical doc if missing)
   if (staffProfile) {
     await saveStaffProfile({
       ...staffProfile,
       approvalStatus: 'deleted',
+      status: 'deleted',
       deletedAt: now,
       deletedBy,
       previousStatus: currentStatus,
       deletionReason: reason || '',
     });
+  } else {
+    await saveStaffProfile({
+      id: userId,
+      userId,
+      idNumber: userDocData?.idNumber || `JLS-${userId.slice(-4)}`,
+      fullName: userDocData?.name || userDocData?.email?.split('@')[0] || 'Staff Member',
+      fatherName: '',
+      motherName: '',
+      email: userDocData?.email || '',
+      contactNumber: userDocData?.phone || 'N/A',
+      emergencyContact: '',
+      address: userDocData?.address || '',
+      designation: userDocData?.designation || 'Staff Member',
+      workingArea: userDocData?.city || 'Head Office',
+      monthlySalary: userDocData?.monthlySalary || 0,
+      photoUrl: userDocData?.photoUrl || '',
+      approvalStatus: 'deleted',
+      status: 'deleted',
+      joinedDate: userDocData?.createdAt ? userDocData.createdAt.split('T')[0] : now.split('T')[0],
+      validUpto: '31 DEC 2028',
+      createdById: deletedBy,
+      deletedAt: now,
+      deletedBy,
+      previousStatus: currentStatus,
+      deletionReason: reason || '',
+      createdAt: userDocData?.createdAt || now,
+    });
   }
 }
 
-export async function restoreStaffProfile(userId: string, _restoredBy: string): Promise<StaffApprovalStatus> {
+export async function restoreStaffProfile(userId: string, restoredBy: string): Promise<StaffApprovalStatus> {
   if (!userId) {
     throw new Error('Staff ID is required for restoration.');
   }
@@ -180,39 +224,83 @@ export async function restoreStaffProfile(userId: string, _restoredBy: string): 
   const userDocSnap = await getDoc(doc(db, 'users', userId));
   const userDocData = userDocSnap.exists() ? (userDocSnap.data() as User) : null;
 
-  const prevStatus = staffProfile?.previousStatus || userDocData?.previousStatus || 'approved';
-  const isApproved = (prevStatus === 'approved' || prevStatus === 'active');
+  const prevStatus =
+    (staffProfile?.previousStatus as StaffApprovalStatus) ||
+    (userDocData?.previousStatus as StaffApprovalStatus) ||
+    'approved';
+
+  const isApproved = prevStatus === 'approved' || prevStatus === 'active';
+  const restoredStatus = isApproved ? 'approved' : prevStatus;
   const now = new Date().toISOString();
 
+  // 1. Restore users/{userId}
   await setDoc(
     doc(db, 'users', userId),
     {
-      status: prevStatus,
+      status: restoredStatus,
       approved: isApproved,
       deletedAt: null,
       deletedBy: null,
+      previousStatus: null,
       deletionReason: null,
       updatedAt: now,
     },
     { merge: true }
   );
 
+  // 2. Restore staffProfiles/{userId}
   if (staffProfile) {
     await saveStaffProfile({
       ...staffProfile,
-      approvalStatus: prevStatus,
+      approvalStatus: restoredStatus,
+      status: restoredStatus,
       deletedAt: undefined,
       deletedBy: undefined,
+      previousStatus: undefined,
       deletionReason: undefined,
+    });
+  } else if (userDocData) {
+    await saveStaffProfile({
+      id: userId,
+      userId,
+      idNumber: userDocData.idNumber || `JLS-${userId.slice(-4)}`,
+      fullName: userDocData.name || userDocData.email?.split('@')[0] || 'Staff Member',
+      fatherName: '',
+      motherName: '',
+      email: userDocData.email || '',
+      contactNumber: userDocData.phone || 'N/A',
+      emergencyContact: '',
+      address: userDocData.address || '',
+      designation: userDocData.designation || 'Staff Member',
+      workingArea: userDocData.city || 'Head Office',
+      monthlySalary: userDocData.monthlySalary || 0,
+      photoUrl: userDocData.photoUrl || '',
+      approvalStatus: restoredStatus,
+      status: restoredStatus,
+      joinedDate: userDocData.createdAt ? userDocData.createdAt.split('T')[0] : now.split('T')[0],
+      validUpto: '31 DEC 2028',
+      createdById: restoredBy,
+      createdAt: userDocData.createdAt || now,
     });
   }
 
-  return prevStatus;
+  return restoredStatus;
 }
 
 export async function deleteStaffProfile(userId: string): Promise<void> {
-  await deleteDoc(doc(db, 'staffProfiles', userId));
-  await deleteDoc(doc(db, 'users', userId));
+  if (!userId) {
+    throw new Error('Staff ID is required for permanent deletion.');
+  }
+
+  // Delete all staff profiles matching userId
+  const q = query(collection(db, 'staffProfiles'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  for (const d of snap.docs) {
+    await deleteDoc(d.ref);
+  }
+
+  await deleteDoc(doc(db, 'staffProfiles', userId)).catch(() => {});
+  await deleteDoc(doc(db, 'users', userId)).catch(() => {});
 }
 
 // Attendance

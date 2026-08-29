@@ -19,7 +19,9 @@ export const StaffListPage: React.FC = () => {
   const navigate = useNavigate();
   const { userDoc } = useAuth();
   const { requirePinVerification } = useSecurity();
-  const { data: staffList, loading } = useRealtimeCollection<StaffProfile>('staffProfiles');
+  const { data: rawStaffList, loading: staffLoading } = useRealtimeCollection<StaffProfile>('staffProfiles');
+  const { data: rawUsersList, loading: usersLoading } = useRealtimeCollection<User>('users');
+  const loading = staffLoading || usersLoading;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -136,23 +138,75 @@ export const StaffListPage: React.FC = () => {
     });
   };
 
-  // Deduplicate by canonical userId / profile ID
+  // Build single canonical staff list by merging staffProfiles and users
   const uniqueStaffMap = new Map<string, StaffProfile>();
-  staffList.forEach((s) => {
+
+  // 1. Process staffProfiles
+  rawStaffList.forEach((s) => {
     const key = s.userId || s.id;
-    if (!uniqueStaffMap.has(key)) {
-      uniqueStaffMap.set(key, s);
-    } else {
-      const existing = uniqueStaffMap.get(key)!;
-      if (s.approvalStatus !== 'pending_profile' && existing.approvalStatus === 'pending_profile') {
-        uniqueStaffMap.set(key, s);
+    if (!key) return;
+    uniqueStaffMap.set(key, { ...s, id: key, userId: key });
+  });
+
+  // 2. Merge with users collection to ensure any staff member in users is represented
+  rawUsersList.forEach((u) => {
+    if (u.role === 'director') return;
+    const key = u.uid;
+    if (!key) return;
+
+    const existing = uniqueStaffMap.get(key);
+    const uStatus = (u.status as string)?.toLowerCase();
+    const isDeletedUser = uStatus === 'deleted';
+
+    if (existing) {
+      if (isDeletedUser) {
+        uniqueStaffMap.set(key, {
+          ...existing,
+          approvalStatus: 'deleted',
+          status: 'deleted',
+          deletedAt: u.deletedAt || existing.deletedAt,
+          deletedBy: u.deletedBy || existing.deletedBy,
+          previousStatus: u.previousStatus || existing.previousStatus,
+          deletionReason: u.deletionReason || existing.deletionReason,
+        });
       }
+    } else {
+      uniqueStaffMap.set(key, {
+        id: key,
+        userId: key,
+        idNumber: u.idNumber || `JLS-${key.slice(-4)}`,
+        fullName: u.name || u.email?.split('@')[0] || 'Staff Member',
+        fatherName: '',
+        motherName: '',
+        email: u.email || '',
+        contactNumber: u.phone || 'N/A',
+        emergencyContact: '',
+        address: u.address || '',
+        designation: u.designation || 'Staff Member',
+        workingArea: u.city || 'Head Office',
+        monthlySalary: u.monthlySalary || 0,
+        photoUrl: u.photoUrl || '',
+        approvalStatus: isDeletedUser ? 'deleted' : ((u.status as StaffApprovalStatus) || 'approved'),
+        status: isDeletedUser ? 'deleted' : ((u.status as StaffApprovalStatus) || 'approved'),
+        deletedAt: u.deletedAt,
+        deletedBy: u.deletedBy,
+        previousStatus: u.previousStatus,
+        deletionReason: u.deletionReason,
+        joinedDate: u.createdAt ? u.createdAt.split('T')[0] : '2026-01-01',
+        validUpto: '31 DEC 2028',
+        createdById: 'director',
+        createdAt: u.createdAt || new Date().toISOString(),
+        updatedAt: u.updatedAt || new Date().toISOString(),
+      });
     }
   });
 
+  const isDeleted = (s: StaffProfile) =>
+    s.approvalStatus?.toLowerCase() === 'deleted' || s.status?.toLowerCase() === 'deleted';
+
   const allStaffArray = Array.from(uniqueStaffMap.values());
-  const activeStaffList = allStaffArray.filter((s) => s.approvalStatus !== 'deleted');
-  const binStaffList = allStaffArray.filter((s) => s.approvalStatus === 'deleted');
+  const activeStaffList = allStaffArray.filter((s) => !isDeleted(s));
+  const binStaffList = allStaffArray.filter((s) => isDeleted(s));
 
   const filteredStaff = allStaffArray.filter((s) => {
     const matchesSearch =
@@ -162,12 +216,12 @@ export const StaffListPage: React.FC = () => {
       s.workingArea.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (statusFilter === 'all') {
-      return matchesSearch && s.approvalStatus !== 'deleted';
+      return matchesSearch && !isDeleted(s);
     }
     if (statusFilter === 'deleted') {
-      return matchesSearch && s.approvalStatus === 'deleted';
+      return matchesSearch && isDeleted(s);
     }
-    return matchesSearch && s.approvalStatus === statusFilter;
+    return matchesSearch && !isDeleted(s) && (s.approvalStatus === statusFilter || s.status === statusFilter);
   });
 
   return (
@@ -293,95 +347,117 @@ export const StaffListPage: React.FC = () => {
         )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredStaff.map((staff) => (
-            <Card key={staff.id} hoverable className="p-5 space-y-4 flex flex-col justify-between">
-              <div className="flex items-start gap-3">
-                <img
-                  src={
-                    staff.photoUrl ||
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
-                  }
-                  alt={staff.fullName}
-                  className="w-14 h-14 rounded-2xl object-cover border-2 border-brand-500 shrink-0"
-                />
-                <div className="truncate flex-1">
-                  <h3 className="text-base font-extrabold text-gray-900 truncate">{staff.fullName}</h3>
-                  <p className="text-xs font-bold text-brand-600 uppercase tracking-wider">{staff.designation}</p>
-                  <p className="text-[11px] text-gray-400 truncate">{staff.workingArea}</p>
-
-                  <Badge
-                    variant={
-                      staff.approvalStatus === 'approved'
-                        ? 'success'
-                        : staff.approvalStatus === 'under_review'
-                        ? 'warning'
-                        : staff.approvalStatus === 'deleted'
-                        ? 'danger'
-                        : 'danger'
+          {filteredStaff.map((staff) => {
+            const isStaffDeleted = isDeleted(staff);
+            return (
+              <Card key={staff.id} hoverable className="p-5 space-y-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <img
+                    src={
+                      staff.photoUrl ||
+                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
                     }
-                    size="sm"
-                    className="mt-1.5 uppercase font-mono"
-                  >
-                    {staff.approvalStatus}
-                  </Badge>
-                </div>
-              </div>
+                    alt={staff.fullName}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-brand-500 shrink-0"
+                  />
+                  <div className="truncate flex-1">
+                    <h3 className="text-base font-extrabold text-gray-900 truncate">{staff.fullName}</h3>
+                    <p className="text-xs font-bold text-brand-600 uppercase tracking-wider">{staff.designation}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{staff.workingArea}</p>
 
-              <div className="space-y-1.5 pt-3 border-t border-gray-100 text-xs text-gray-600">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">ID Number:</span>
-                  <span className="font-mono font-bold text-gray-900">{staff.idNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Monthly Salary:</span>
-                  <span className="font-bold text-emerald-600">₹{staff.monthlySalary?.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Contact:</span>
-                  <span className="font-medium text-gray-900">{staff.contactNumber}</span>
-                </div>
-                {staff.approvalStatus === 'deleted' && (
-                  <div className="pt-2 border-t text-[11px] text-red-600 space-y-0.5">
-                    <p className="font-bold">Deleted on: {staff.deletedAt ? staff.deletedAt.split('T')[0] : 'N/A'}</p>
-                    <p>Previous Status: <span className="font-mono font-bold uppercase">{staff.previousStatus || 'N/A'}</span></p>
+                    <Badge
+                      variant={
+                        isStaffDeleted
+                          ? 'danger'
+                          : staff.approvalStatus === 'approved'
+                          ? 'success'
+                          : staff.approvalStatus === 'under_review'
+                          ? 'warning'
+                          : 'danger'
+                      }
+                      size="sm"
+                      className="mt-1.5 uppercase font-mono"
+                    >
+                      {isStaffDeleted ? 'DELETED' : staff.approvalStatus}
+                    </Badge>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {staff.approvalStatus === 'deleted' ? (
-                <div className="flex items-center gap-2 pt-2">
+                <div className="space-y-1.5 pt-3 border-t border-gray-100 text-xs text-gray-600">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">ID Number:</span>
+                    <span className="font-mono font-bold text-gray-900">{staff.idNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Email:</span>
+                    <span className="font-medium text-gray-900 truncate max-w-[170px]">{staff.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Contact:</span>
+                    <span className="font-medium text-gray-900">{staff.contactNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Monthly Salary:</span>
+                    <span className="font-bold text-emerald-600">₹{staff.monthlySalary?.toLocaleString('en-IN')}</span>
+                  </div>
+                  {isStaffDeleted && (
+                    <div className="pt-2 border-t text-[11px] text-red-600 space-y-0.5 bg-red-50/60 p-2.5 rounded-xl border border-red-100">
+                      <p className="font-bold">Deleted on: {staff.deletedAt ? staff.deletedAt.split('T')[0] : 'N/A'}</p>
+                      <p>Deleted By: <span className="font-mono font-bold">{staff.deletedBy || 'Director'}</span></p>
+                      <p>Previous Status: <span className="font-mono font-bold uppercase">{staff.previousStatus || 'APPROVED'}</span></p>
+                      {staff.deletionReason && (
+                        <p className="italic text-[10px] text-red-500">Reason: "{staff.deletionReason}"</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {isStaffDeleted ? (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        icon={<RotateCcw className="w-3.5 h-3.5 text-emerald-600" />}
+                        onClick={() => handleRestoreStaff(staff)}
+                      >
+                        Restore
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        className="flex-1"
+                        icon={<Trash2 className="w-3.5 h-3.5" />}
+                        onClick={() => handlePermanentDestroyStaff(staff)}
+                      >
+                        Delete Forever
+                      </Button>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                      icon={<Eye className="w-3.5 h-3.5" />}
+                      onClick={() => navigate(`/staff/${staff.id}`)}
+                    >
+                      View Profile Details
+                    </Button>
+                  </div>
+                ) : (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
-                    icon={<RotateCcw className="w-3.5 h-3.5 text-emerald-600" />}
-                    onClick={() => handleRestoreStaff(staff)}
+                    className="w-full mt-2"
+                    icon={<Eye className="w-3.5 h-3.5" />}
+                    onClick={() => navigate(`/staff/${staff.id}`)}
                   >
-                    Restore
+                    View Complete Staff File & ID Card
                   </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    className="flex-1"
-                    icon={<Trash2 className="w-3.5 h-3.5" />}
-                    onClick={() => handlePermanentDestroyStaff(staff)}
-                  >
-                    Delete Forever
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
-                  icon={<Eye className="w-3.5 h-3.5" />}
-                  onClick={() => navigate(`/staff/${staff.id}`)}
-                >
-                  View Complete Staff File & ID Card
-                </Button>
-              )}
-            </Card>
-          ))}
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
 

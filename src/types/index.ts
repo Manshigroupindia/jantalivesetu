@@ -20,6 +20,7 @@ export interface User {
   firstLoginCompleted: boolean;
   pinHash?: string;
   name?: string;
+  idNumber?: string;
   designation?: string;
   photoUrl?: string;
   phone?: string;
@@ -30,6 +31,8 @@ export interface User {
   pincode?: string;
   country?: string;
   bio?: string;
+  monthlySalary?: number;
+  isSuspended?: boolean;
   deletedAt?: string;
   deletedBy?: string;
   previousStatus?: StaffApprovalStatus;
@@ -56,6 +59,7 @@ export interface StaffProfile {
   documentsUrl?: string; // merged PDF or compressed docs
   offerLetterUrl?: string;
   approvalStatus: StaffApprovalStatus;
+  status?: StaffApprovalStatus;
   rejectionReason?: string;
   joinedDate: string;
   validUpto: string;

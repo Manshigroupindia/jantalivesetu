@@ -38,8 +38,9 @@ export const ExecutiveDashboard: React.FC = () => {
   const { data: expenses } = useRealtimeCollection<ExpenseItem>('expenses');
   const { data: works } = useRealtimeCollection<WorkAssignment>('workAssignments');
 
-  const totalStaffCount = users.filter((u) => u.role !== 'director').length;
-  const pendingApprovalsCount = users.filter((u) => u.status === 'under_review' || !u.approved).length;
+  const activeUsers = users.filter((u) => u.role !== 'director' && u.status?.toLowerCase() !== 'deleted');
+  const totalStaffCount = activeUsers.length;
+  const pendingApprovalsCount = activeUsers.filter((u) => u.status === 'under_review' || !u.approved).length;
   const presentTodayCount = todayAttendance.filter((a) => a.date === todayStr && (a.status === 'present' || a.status === 'on_duty')).length;
   
   const totalPendingExpenses = expenses
