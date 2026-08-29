@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { FileUploader } from '../../components/common/FileUploader';
 import { Droplet, Calendar, Edit3, Trash2, AlertTriangle, History, Plus } from 'lucide-react';

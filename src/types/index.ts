@@ -251,6 +251,9 @@ export interface WaterRecord {
   note?: string;
   createdAt: string;
   updatedAt?: string;
+  updatedById?: string;
+  updatedByName?: string;
+  updateReason?: string;
 }
 
 export interface ElectricityRecord {
