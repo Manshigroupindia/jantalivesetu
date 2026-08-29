@@ -141,3 +141,74 @@ exports.permanentDeleteRecord = functions.https.onCall(async (data, context) => 
 
   return { success: true };
 });
+
+/**
+ * Callable Function: Create Staff Account securely without logging out Director
+ */
+exports.createStaffAccount = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+  if (!callerDoc.exists || callerDoc.data().role !== "director") {
+    throw new functions.https.HttpsError("permission-denied", "Only Director can create staff accounts.");
+  }
+
+  const { email, temporaryPass, role, designation, workingArea, monthlySalary, fullName, contactNumber, pin, idNumber } = data;
+  if (!email || !temporaryPass || !fullName) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing required staff parameters.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  // Create Firebase Auth user via Admin SDK
+  const userRecord = await admin.auth().createUser({
+    email: normalizedEmail,
+    password: temporaryPass,
+    displayName: fullName,
+  });
+
+  const uid = userRecord.uid;
+  const pinHash = hashPin(pin || "1234");
+  const now = new Date().toISOString();
+
+  // Set custom user claims
+  await admin.auth().setCustomUserClaims(uid, { role: role || "staff" });
+
+  // Write to users collection
+  await db.collection("users").doc(uid).set({
+    uid,
+    email: normalizedEmail,
+    role: role || "staff",
+    approved: false,
+    status: "pending_profile",
+    firstLoginCompleted: false,
+    pinHash,
+    name: fullName,
+    designation: designation || "Reporter",
+    idNumber: idNumber || `JL-STAFF-${new Date().getFullYear()}-0001`,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Write to staffProfiles collection
+  await db.collection("staffProfiles").doc(uid).set({
+    id: uid,
+    userId: uid,
+    idNumber: idNumber || `JL-STAFF-${new Date().getFullYear()}-0001`,
+    fullName,
+    email: normalizedEmail,
+    contactNumber: contactNumber || "N/A",
+    designation: designation || "Reporter",
+    workingArea: workingArea || "Head Office",
+    monthlySalary: monthlySalary || 12000,
+    approvalStatus: "pending_profile",
+    joinedDate: now.split("T")[0],
+    validUpto: "31 DEC 2028",
+    createdById: context.auth.uid,
+    createdAt: now,
+  });
+
+  return { success: true, uid };
+});

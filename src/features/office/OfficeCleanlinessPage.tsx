@@ -10,11 +10,13 @@ import { CleaningRecord } from '../../types';
 import { createCleaningRecord } from '../../services/firestoreService';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { orderBy } from 'firebase/firestore';
 
 export const OfficeCleanlinessPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
+  const { showToast } = useNotification();
   const { data: records, loading } = useRealtimeCollection<CleaningRecord>('cleaningRecords', [
     orderBy('createdAt', 'desc'),
   ]);
@@ -45,9 +47,9 @@ export const OfficeCleanlinessPage: React.FC = () => {
         createdAt: new Date().toISOString(),
       });
 
-      alert('Cleaning record logged successfully.');
+      showToast('Cleaning record logged successfully.', 'success');
     } catch (err) {
-      alert('Failed to log cleaning record.');
+      showToast('Failed to log cleaning record.', 'error');
     } finally {
       setSubmitting(false);
     }

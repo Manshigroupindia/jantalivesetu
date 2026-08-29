@@ -13,12 +13,14 @@ import { restoreStaffProfile, deleteStaffProfile, normalizeStaffData } from '../
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 
 export const StaffListPage: React.FC = () => {
   const navigate = useNavigate();
   const { userDoc } = useAuth();
   const { requirePinVerification } = useSecurity();
+  const { showToast, showAlert } = useNotification();
   const { data: rawStaffList, loading: staffLoading } = useRealtimeCollection<StaffProfile>('staffProfiles');
   const { data: rawUsersList, loading: usersLoading } = useRealtimeCollection<User>('users');
   const loading = staffLoading || usersLoading;
@@ -82,7 +84,11 @@ export const StaffListPage: React.FC = () => {
       setFullName('');
       setEmail('');
       setTempPass('');
-      alert('Staff credentials created successfully. Staff member can now login and complete profile.');
+      showAlert({
+        title: 'Staff Created Successfully',
+        message: 'Staff account created successfully. Staff member can now login and complete profile.',
+        type: 'success'
+      });
     } catch (err: any) {
       console.error('Create staff error:', err);
       setError(err.message || 'Failed to create staff account. Secure with Janta Live Setu.');
@@ -103,9 +109,9 @@ export const StaffListPage: React.FC = () => {
           module: 'staff',
           recordId: staffItem.userId,
         });
-        alert(`Staff member ${staffItem.fullName} restored successfully under status (${restoredStatus.toUpperCase()}).`);
+        showToast(`Staff member ${staffItem.fullName} restored successfully (${restoredStatus.toUpperCase()}).`, 'success');
       } catch (err: any) {
-        alert('Failed to restore staff member. Check security permissions.');
+        showToast('Failed to restore staff member. Check security permissions.', 'error');
       }
     });
   };
@@ -119,7 +125,7 @@ export const StaffListPage: React.FC = () => {
   const confirmPermanentDestroy = () => {
     if (!selectedStaffForPermanentDestroy) return;
     if (permanentDestroyConfirmText.trim() !== 'DELETE FOREVER') {
-      alert('Please type DELETE FOREVER to confirm permanent record destruction.');
+      showToast('Please type DELETE FOREVER to confirm permanent record destruction.', 'warning');
       return;
     }
 
@@ -135,9 +141,9 @@ export const StaffListPage: React.FC = () => {
           recordId: selectedStaffForPermanentDestroy.userId,
         });
         setPermanentDestroyModalOpen(false);
-        alert(`Staff record for ${selectedStaffForPermanentDestroy.fullName} has been permanently destroyed.`);
+        showToast(`Staff record for ${selectedStaffForPermanentDestroy.fullName} has been permanently destroyed.`, 'success');
       } catch (err: any) {
-        alert('Failed to permanently destroy staff record.');
+        showToast('Failed to permanently destroy staff record.', 'error');
       }
     });
   };

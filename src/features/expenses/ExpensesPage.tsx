@@ -13,6 +13,7 @@ import { createExpenseItem, updateExpenseStatus } from '../../services/firestore
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { where } from 'firebase/firestore';
@@ -21,6 +22,7 @@ export const ExpensesPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { isDirector } = usePermissions();
   const { requirePinVerification } = useSecurity();
+  const { showToast, showPrompt } = useNotification();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<ExpenseItem | null>(null);
@@ -81,7 +83,7 @@ export const ExpensesPage: React.FC = () => {
       setAmount(500);
       setDescription('');
       setReceiptUrl('');
-      alert('Expense reimbursement claim submitted successfully.');
+      showToast('Expense reimbursement claim submitted successfully.', 'success');
     } catch (err: any) {
       console.error('Expense submission error:', err);
       setError('Failed to submit expense claim. Secure with Janta Live Setu.');
@@ -95,9 +97,9 @@ export const ExpensesPage: React.FC = () => {
       try {
         await updateExpenseStatus(expId, 'approved', userDoc?.uid, 'Approved by Director');
         setSelectedExpense(null);
-        alert('Expense approved successfully.');
+        showToast('Expense approved successfully.', 'success');
       } catch (err) {
-        alert('Failed to approve expense.');
+        showToast('Failed to approve expense.', 'error');
       }
     });
   };
@@ -107,23 +109,33 @@ export const ExpensesPage: React.FC = () => {
       try {
         await updateExpenseStatus(expId, 'paid', userDoc?.uid, 'Payout Processed');
         setSelectedExpense(null);
-        alert('Expense marked as Paid.');
+        showToast('Expense marked as Paid.', 'success');
       } catch (err) {
-        alert('Failed to update payment status.');
+        showToast('Failed to update payment status.', 'error');
       }
     });
   };
 
-  const handleRejectExpense = async (expId: string) => {
-    const reason = prompt('Enter rejection reason:');
-    if (!reason) return;
-    try {
-      await updateExpenseStatus(expId, 'rejected', userDoc?.uid, reason);
-      setSelectedExpense(null);
-      alert('Expense rejected.');
-    } catch (err) {
-      alert('Failed to reject expense.');
-    }
+  const handleRejectExpense = (expId: string) => {
+    showPrompt({
+      title: 'Reject Expense Claim',
+      message: 'Please provide a clear reason for rejecting this reimbursement claim:',
+      placeholder: 'e.g. Missing valid tax invoice receipt',
+      confirmText: 'Reject Claim',
+      onConfirm: async (reason: string) => {
+        if (!reason.trim()) {
+          showToast('Rejection reason cannot be empty.', 'warning');
+          return;
+        }
+        try {
+          await updateExpenseStatus(expId, 'rejected', userDoc?.uid, reason.trim());
+          setSelectedExpense(null);
+          showToast('Expense rejected.', 'success');
+        } catch (err) {
+          showToast('Failed to reject expense.', 'error');
+        }
+      },
+    });
   };
 
   const filteredExpenses = expenses.filter((e) => {

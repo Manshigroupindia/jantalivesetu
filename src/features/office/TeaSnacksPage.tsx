@@ -23,12 +23,14 @@ import {
 import { getCurrentDateISO, getCurrentMonthISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { orderBy } from 'firebase/firestore';
 
 export const TeaSnacksPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { companySettings } = useCompany();
+  const { showToast, showConfirm } = useNotification();
   const { data: logs, loading, error } = useRealtimeCollection<TeaSnackLog>('teaSnackLogs', [
     orderBy('createdAt', 'desc'),
   ]);
@@ -130,12 +132,12 @@ export const TeaSnacksPage: React.FC = () => {
   const handleAddLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userDoc) {
-      alert('Your session has expired. Please login again.');
+      showToast('Your session has expired. Please login again.', 'error');
       return;
     }
 
     if (safeQuantity <= 0) {
-      alert('Please enter a valid quantity of 1 or more.');
+      showToast('Please enter a valid quantity of 1 or more.', 'warning');
       return;
     }
 
@@ -162,13 +164,13 @@ export const TeaSnacksPage: React.FC = () => {
 
       setQuantity(1);
       setNotes('');
-      alert('Tea / Snacks log saved successfully.');
+      showToast('Tea / Snacks log saved successfully.', 'success');
     } catch (err: any) {
       console.error('Failed to log tea/snacks entry:', err);
       if (err?.code === 'permission-denied') {
-        alert('Permission Denied: You do not have permission to write to Tea & Snacks logs.');
+        showToast('Permission Denied: You do not have permission to write to Tea & Snacks logs.', 'error');
       } else {
-        alert(err?.message || 'Failed to save tea/snacks entry. Please check connection and try again.');
+        showToast(err?.message || 'Failed to save tea/snacks entry. Please check connection and try again.', 'error');
       }
     } finally {
       setSubmitting(false);
@@ -192,7 +194,7 @@ export const TeaSnacksPage: React.FC = () => {
     if (!editingLog || !userDoc) return;
 
     if (!editReason.trim()) {
-      alert('A valid reason for modification is MANDATORY before saving changes.');
+      showToast('A valid reason for modification is MANDATORY before saving changes.', 'warning');
       return;
     }
 
@@ -222,10 +224,10 @@ export const TeaSnacksPage: React.FC = () => {
 
       await updateTeaSnackLog(editingLog.id, updates);
       setEditingLog(null);
-      alert('Tea / Snacks log updated successfully.');
+      showToast('Tea / Snacks log updated successfully.', 'success');
     } catch (err: any) {
       console.error('Failed to update log:', err);
-      alert(err?.message || 'Failed to update record.');
+      showToast(err?.message || 'Failed to update record.', 'error');
     } finally {
       setUpdating(false);
     }
@@ -238,21 +240,24 @@ export const TeaSnacksPage: React.FC = () => {
     const isOwner = log.loggedById === userDoc.uid || log.loggedByUserId === userDoc.uid;
 
     if (!isDirector && !isOwner) {
-      alert('Permission Denied: Only the Director or creator can delete this record.');
+      showToast('Permission Denied: Only the Director or creator can delete this record.', 'error');
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete this Tea/Snacks entry permanently?')) {
-      return;
-    }
-
-    try {
-      await deleteTeaSnackLog(log.id);
-      alert('Record deleted successfully.');
-    } catch (err: any) {
-      console.error('Failed to delete log:', err);
-      alert('Failed to delete record.');
-    }
+    showConfirm({
+      title: 'Delete Entry',
+      message: 'Are you sure you want to delete this Tea/Snacks entry permanently?',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          await deleteTeaSnackLog(log.id);
+          showToast('Record deleted successfully.', 'success');
+        } catch (err: any) {
+          console.error('Failed to delete log:', err);
+          showToast('Failed to delete record.', 'error');
+        }
+      },
+    });
   };
 
   return (

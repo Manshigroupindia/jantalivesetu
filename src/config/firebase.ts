@@ -2,7 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDtI9b5bIzjUXszKtZU4i0QqFLzpxEHsiM",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "janta-live-setu-8c68b.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "janta-live-setu-8c68b",

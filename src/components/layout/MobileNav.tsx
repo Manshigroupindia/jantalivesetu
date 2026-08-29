@@ -16,16 +16,27 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { signOutUser } from '../../services/authService';
 
+import { useNotification } from '../../contexts/NotificationContext';
+
 export const MobileNav: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { companySettings } = useCompany();
   const { userDoc, staffProfile } = useAuth();
   const { can, role } = usePermissions();
+  const { showConfirm } = useNotification();
 
-  const handleLogout = async () => {
-    if (confirm('Are you sure you want to sign out?')) {
-      await signOutUser();
-    }
+  const handleLogout = () => {
+    showConfirm({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out of Janta Live Setu?',
+      confirmText: 'Sign Out',
+      cancelText: 'Cancel',
+      isDanger: true,
+      onConfirm: async () => {
+        setDrawerOpen(false);
+        await signOutUser();
+      },
+    });
   };
 
   const navItems = [

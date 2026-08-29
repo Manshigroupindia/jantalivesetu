@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { ZoomIn, ZoomOut, RotateCcw, Crop } from 'lucide-react';
 import { cropImageToBlob } from '../../utils/cropImage';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface ImageCropperModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   onClose,
   onCropComplete,
 }) => {
+  const { showToast } = useNotification();
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
@@ -131,7 +133,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
       onClose();
     } catch (err) {
       console.error('Crop error:', err);
-      alert('Unable to process this image. Please try another image.');
+      showToast('Unable to process this image. Please try another image.', 'error');
       setProcessing(false);
     }
   };

@@ -1,11 +1,13 @@
+import { initializeApp, deleteApp } from 'firebase/app';
 import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  getAuth
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db, firebaseConfig } from '../config/firebase';
 import { User, UserRole } from '../types';
 import { getNextUniqueStaffId } from '../utils/idGenerator';
 
@@ -100,19 +102,27 @@ export async function createStaffAccountByDirector(data: {
   }
 
   let uid: string;
+  // Initialize isolated secondary Firebase app to prevent logging out the current Director session
+  const secondaryAppName = `StaffCreationApp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+  const secondaryAuth = getAuth(secondaryApp);
+
   try {
-    // Create user in Firebase Auth
-    const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, data.temporaryPass);
+    const credential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, data.temporaryPass);
     uid = credential.user.uid;
+    await firebaseSignOut(secondaryAuth);
   } catch (authErr: any) {
     if (authErr.code === 'auth/email-already-in-use') {
       throw new Error(`This email (${normalizedEmail}) is already registered in Firebase Authentication.`);
     }
     throw authErr;
+  } finally {
+    await deleteApp(secondaryApp).catch((err) => {
+      console.warn('Could not clean up secondary Firebase app instance:', err);
+    });
   }
 
   const pinHash = simpleHashPin(data.pin);
-
   const uniqueIdNumber = await getNextUniqueStaffId();
 
   const newUser: User = {

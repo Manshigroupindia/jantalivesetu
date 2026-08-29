@@ -51,7 +51,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setUserDoc(null);
                 setStaffProfile(null);
                 setLoading(false);
-                alert('Your Janta Live Setu account has been removed. Please contact the Director.');
                 await signOutUser();
                 return;
               }
@@ -64,7 +63,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setUserDoc(null);
                   setStaffProfile(null);
                   setLoading(false);
-                  alert('Your Janta Live Setu account has been removed. Please contact the Director.');
                   await signOutUser();
                   return;
                 }
@@ -93,7 +91,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUserDoc(null);
               setStaffProfile(null);
               setLoading(false);
-              alert('Your Janta Live Setu account has been removed. Please contact the Director.');
               await signOutUser();
               return;
             }

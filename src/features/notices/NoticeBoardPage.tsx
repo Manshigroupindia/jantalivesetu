@@ -14,12 +14,14 @@ import { getCurrentDateISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { orderBy } from 'firebase/firestore';
 
 export const NoticeBoardPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { isDirector, can } = usePermissions();
   const { requireReauthVerification } = useSecurity();
+  const { showToast } = useNotification();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -55,9 +57,9 @@ export const NoticeBoardPage: React.FC = () => {
       setTitle('');
       setDescription('');
       setAttachmentUrl('');
-      alert('Official notice published.');
+      showToast('Official notice published.', 'success');
     } catch (err) {
-      alert('Failed to publish notice.');
+      showToast('Failed to publish notice.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -67,9 +69,9 @@ export const NoticeBoardPage: React.FC = () => {
     requireReauthVerification('Permanently Delete Official Notice', async () => {
       try {
         await deleteNotice(id);
-        alert('Notice deleted.');
+        showToast('Notice deleted.', 'success');
       } catch (err) {
-        alert('Failed to delete notice.');
+        showToast('Failed to delete notice.', 'error');
       }
     });
   };

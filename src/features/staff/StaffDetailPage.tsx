@@ -13,6 +13,7 @@ import { StaffProfile } from '../../types';
 import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export const StaffDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ export const StaffDetailPage: React.FC = () => {
   const { companySettings } = useCompany();
   const { userDoc: currentUser } = useAuth();
   const { requirePinVerification } = useSecurity();
+  const { showToast, showAlert } = useNotification();
 
   const [staff, setStaff] = useState<StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,9 +88,9 @@ export const StaffDetailPage: React.FC = () => {
         });
 
         setStaff((prev) => (prev ? { ...prev, approvalStatus: 'approved' } : null));
-        alert('Staff profile approved & account activated successfully.');
+        showToast('Staff profile approved & account activated successfully.', 'success');
       } catch (err: any) {
-        alert('Failed to approve staff profile.');
+        showToast('Failed to approve staff profile.', 'error');
       } finally {
         setUpdating(false);
       }
@@ -97,7 +99,7 @@ export const StaffDetailPage: React.FC = () => {
 
   const handleRejectStaff = () => {
     if (!rejectionReason.trim()) {
-      alert('Please enter a rejection reason for the staff member.');
+      showToast('Please enter a rejection reason for the staff member.', 'warning');
       return;
     }
 
@@ -125,9 +127,9 @@ export const StaffDetailPage: React.FC = () => {
         );
         setRejectModalOpen(false);
         setRejectionReason('');
-        alert('Staff profile rejected. Staff member can resubmit profile.');
+        showToast('Staff profile rejected. Staff member can resubmit profile.', 'success');
       } catch (err: any) {
-        alert('Failed to reject staff profile.');
+        showToast('Failed to reject staff profile.', 'error');
       } finally {
         setUpdating(false);
       }
@@ -151,9 +153,9 @@ export const StaffDetailPage: React.FC = () => {
         });
 
         setStaff((prev) => (prev ? { ...prev, approvalStatus: 'suspended' } : null));
-        alert('Staff profile suspended.');
+        showToast('Staff profile suspended.', 'warning');
       } catch (err: any) {
-        alert('Failed to suspend staff.');
+        showToast('Failed to suspend staff.', 'error');
       } finally {
         setUpdating(false);
       }
@@ -177,9 +179,9 @@ export const StaffDetailPage: React.FC = () => {
         });
 
         setStaff((prev) => (prev ? { ...prev, approvalStatus: 'approved' } : null));
-        alert('Staff account reactivated successfully.');
+        showToast('Staff account reactivated successfully.', 'success');
       } catch (err: any) {
-        alert('Failed to reactivate staff account.');
+        showToast('Failed to reactivate staff account.', 'error');
       } finally {
         setUpdating(false);
       }
@@ -189,11 +191,11 @@ export const StaffDetailPage: React.FC = () => {
   const handleSoftDeleteStaff = () => {
     if (!staff) return;
     if (currentUser && staff.userId === currentUser.uid) {
-      alert('Director account cannot be deleted from Staff Management.');
+      showToast('Director account cannot be deleted from Staff Management.', 'error');
       return;
     }
     if (deleteConfirmText.trim() !== 'DELETE') {
-      alert('Please type DELETE to confirm moving staff record to Bin.');
+      showToast('Please type DELETE to confirm moving staff record to Bin.', 'warning');
       return;
     }
 
@@ -212,11 +214,11 @@ export const StaffDetailPage: React.FC = () => {
         });
 
         setDeleteModalOpen(false);
-        alert(`Staff account for ${staff.fullName} has been deleted and moved to Bin. Remote devices logged out.`);
+        showToast(`Staff account for ${staff.fullName} moved to Bin.`, 'success');
         navigate('/staff');
       } catch (err: any) {
         console.error('Delete staff error:', err);
-        alert(err.message || 'Failed to delete staff account. Check security permissions.');
+        showToast(err.message || 'Failed to delete staff account.', 'error');
       } finally {
         setUpdating(false);
       }
@@ -237,9 +239,9 @@ export const StaffDetailPage: React.FC = () => {
         setStaff((prev) =>
           prev ? { ...prev, monthlySalary: salary, designation, workingArea } : null
         );
-        alert('Staff profile details updated.');
+        showToast('Staff profile details updated.', 'success');
       } catch (err: any) {
-        alert('Failed to update details.');
+        showToast('Failed to update details.', 'error');
       } finally {
         setUpdating(false);
       }

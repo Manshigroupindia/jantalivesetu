@@ -9,11 +9,13 @@ import { setCompanySettings } from '../../services/firestoreService';
 import { setSecurityPin } from '../../services/authService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export const SettingsPage: React.FC = () => {
   const { companySettings } = useCompany();
   const { userDoc } = useAuth();
   const { requirePinVerification } = useSecurity();
+  const { showToast } = useNotification();
 
   const [companyName, setCompanyName] = useState(companySettings?.companyName || 'Janta Live');
   const [logoUrl, setLogoUrl] = useState(companySettings?.logoUrl || '');
@@ -50,9 +52,9 @@ export const SettingsPage: React.FC = () => {
           setupCompleted: true,
         });
 
-        alert('Company settings saved.');
+        showToast('Company settings saved.', 'success');
       } catch (err) {
-        alert('Failed to save settings.');
+        showToast('Failed to save settings.', 'error');
       } finally {
         setSaving(false);
       }
@@ -62,7 +64,7 @@ export const SettingsPage: React.FC = () => {
   const handleUpdatePin = () => {
     if (!userDoc) return;
     if (newPin.length !== 4 || newPin !== confirmPin) {
-      alert('PIN must be 4 digits and match confirmation.');
+      showToast('PIN must be 4 digits and match confirmation.', 'warning');
       return;
     }
 
@@ -71,9 +73,9 @@ export const SettingsPage: React.FC = () => {
         await setSecurityPin(userDoc.uid, newPin);
         setNewPin('');
         setConfirmPin('');
-        alert('Security PIN updated successfully.');
+        showToast('Security PIN updated successfully.', 'success');
       } catch (err) {
-        alert('Failed to update PIN.');
+        showToast('Failed to update PIN.', 'error');
       }
     });
   };

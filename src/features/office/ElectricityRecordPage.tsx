@@ -10,12 +10,14 @@ import { createElectricityRecord } from '../../services/firestoreService';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { orderBy } from 'firebase/firestore';
 
 export const ElectricityRecordPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { companySettings } = useCompany();
+  const { showToast } = useNotification();
   const { data: records, loading } = useRealtimeCollection<ElectricityRecord>('electricityRecords', [
     orderBy('createdAt', 'desc'),
   ]);
@@ -35,7 +37,7 @@ export const ElectricityRecordPage: React.FC = () => {
     if (!userDoc) return;
 
     if (currentReading < prevReading) {
-      alert('Current reading cannot be lower than previous reading.');
+      showToast('Current reading cannot be lower than previous reading.', 'warning');
       return;
     }
 
@@ -55,9 +57,9 @@ export const ElectricityRecordPage: React.FC = () => {
         createdAt: new Date().toISOString(),
       });
 
-      alert('Electricity meter reading logged.');
+      showToast('Electricity meter reading logged.', 'success');
     } catch (err) {
-      alert('Failed to log electricity reading.');
+      showToast('Failed to log electricity reading.', 'error');
     } finally {
       setSubmitting(false);
     }

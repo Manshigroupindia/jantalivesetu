@@ -10,12 +10,14 @@ import { OfficeRentRecord } from '../../types';
 import { createOfficeRentRecord } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { orderBy } from 'firebase/firestore';
 
 export const OfficeRentPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { requirePinVerification } = useSecurity();
+  const { showToast } = useNotification();
   const { data: records, loading } = useRealtimeCollection<OfficeRentRecord>('officeRentRecords', [
     orderBy('createdAt', 'desc'),
   ]);
@@ -47,9 +49,9 @@ export const OfficeRentPage: React.FC = () => {
           createdAt: new Date().toISOString(),
         });
 
-        alert('Office rent payment record saved.');
+        showToast('Office rent payment record saved.', 'success');
       } catch (err) {
-        alert('Failed to log rent payment.');
+        showToast('Failed to log rent payment.', 'error');
       } finally {
         setSubmitting(false);
       }

@@ -8,10 +8,12 @@ import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { ClientRecord } from '../../types';
 import { createClientRecord } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { orderBy } from 'firebase/firestore';
 
 export const ClientDirectoryPage: React.FC = () => {
   const { userDoc } = useAuth();
+  const { showToast } = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
   const [clientName, setClientName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -52,9 +54,9 @@ export const ClientDirectoryPage: React.FC = () => {
       setEmail('');
       setAddress('');
       setNotes('');
-      alert('Client record added to directory.');
+      showToast('Client record added to directory.', 'success');
     } catch (err) {
-      alert('Failed to add client.');
+      showToast('Failed to add client.', 'error');
     } finally {
       setSubmitting(false);
     }

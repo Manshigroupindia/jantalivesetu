@@ -16,11 +16,13 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { saveSalaryRecord, saveStaffProfile } from '../../services/firestoreService';
 import { logAuditEvent } from '../../services/auditService';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export const SalaryPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { isDirector } = usePermissions();
   const { requirePinVerification } = useSecurity();
+  const { showToast } = useNotification();
 
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
@@ -77,7 +79,7 @@ export const SalaryPage: React.FC = () => {
     if (!staff) return;
 
     if (newSalary <= 0) {
-      alert('Please enter a valid monthly base salary greater than 0.');
+      showToast('Please enter a valid monthly base salary greater than 0.', 'warning');
       return;
     }
 
@@ -100,10 +102,10 @@ export const SalaryPage: React.FC = () => {
         });
 
         setEditModalOpen(false);
-        alert(`Salary updated successfully for ${staff.fullName}. New Base: ₹${newSalary}`);
+        showToast(`Salary updated successfully for ${staff.fullName}. New Base: ₹${newSalary}`, 'success');
       } catch (err: any) {
         console.error('Failed to update salary:', err);
-        alert(err?.message || 'Failed to update base salary.');
+        showToast(err?.message || 'Failed to update base salary.', 'error');
       } finally {
         setSavingSalary(false);
       }
@@ -147,9 +149,9 @@ export const SalaryPage: React.FC = () => {
           recordId: `${staff.userId}_${selectedMonth}`,
         });
 
-        alert(`Payroll finalized for ${staff.fullName}.`);
+        showToast(`Payroll finalized for ${staff.fullName}.`, 'success');
       } catch (err) {
-        alert('Failed to finalize payroll.');
+        showToast('Failed to finalize payroll.', 'error');
       }
     });
   };

@@ -8,10 +8,12 @@ import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { ChatMessage } from '../../types';
 import { sendChatMessage } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { orderBy, limit } from 'firebase/firestore';
 
 export const ChatPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
+  const { showToast } = useNotification();
   const [text, setText] = useState('');
   const [voiceUrl, setVoiceUrl] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
@@ -55,7 +57,7 @@ export const ChatPage: React.FC = () => {
       setShowVoiceRecorder(false);
       setShowUploader(false);
     } catch (err) {
-      alert('Failed to send message.');
+      showToast('Failed to send message.', 'error');
     } finally {
       setSending(false);
     }

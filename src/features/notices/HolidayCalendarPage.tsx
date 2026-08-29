@@ -10,12 +10,14 @@ import { createCompanyHoliday, deleteCompanyHoliday } from '../../services/fires
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { orderBy } from 'firebase/firestore';
 
 export const HolidayCalendarPage: React.FC = () => {
   const { userDoc } = useAuth();
   const { isDirector, can } = usePermissions();
   const { requireReauthVerification } = useSecurity();
+  const { showToast } = useNotification();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [holidayName, setHolidayName] = useState('');
@@ -45,9 +47,9 @@ export const HolidayCalendarPage: React.FC = () => {
       setHolidayName('');
       setDate('');
       setDescription('');
-      alert('Company holiday added.');
+      showToast('Company holiday added.', 'success');
     } catch (err) {
-      alert('Failed to add holiday.');
+      showToast('Failed to add holiday.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -57,9 +59,9 @@ export const HolidayCalendarPage: React.FC = () => {
     requireReauthVerification('Delete Company Paid Holiday Record', async () => {
       try {
         await deleteCompanyHoliday(id);
-        alert('Holiday deleted.');
+        showToast('Holiday deleted.', 'success');
       } catch (err) {
-        alert('Failed to delete holiday.');
+        showToast('Failed to delete holiday.', 'error');
       }
     });
   };

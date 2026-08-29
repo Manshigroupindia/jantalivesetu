@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { SecurityProvider } from './contexts/SecurityContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ProtectedRoute } from './components/security/ProtectedRoute';
@@ -37,6 +38,7 @@ import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { ClientDirectoryPage } from './features/clients/ClientDirectoryPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { ProfilePage } from './features/profile/ProfilePage';
+import { NotFoundPage } from './features/error/NotFoundPage';
 
 const DashboardResolver: React.FC = () => {
   const { userDoc } = useAuth();
@@ -50,9 +52,10 @@ export const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AuthProvider>
-          <CompanyProvider>
-            <SecurityProvider>
+        <NotificationProvider>
+          <AuthProvider>
+            <CompanyProvider>
+              <SecurityProvider>
               <Routes>
                 {/* AUTH ROUTES */}
                 <Route path="/login" element={<LoginPage />} />
@@ -93,17 +96,20 @@ export const App: React.FC = () => {
                           <Route path="clients" element={<ClientDirectoryPage />} />
                           <Route path="settings" element={<SettingsPage />} />
 
-                          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                          <Route path="404" element={<NotFoundPage />} />
+                          <Route path="*" element={<NotFoundPage />} />
                         </Routes>
                       </AppShell>
                     </ProtectedRoute>
                   }
                 />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </SecurityProvider>
           </CompanyProvider>
         </AuthProvider>
-      </BrowserRouter>
+      </NotificationProvider>
+    </BrowserRouter>
     </ErrorBoundary>
   );
 };

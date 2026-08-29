@@ -12,6 +12,7 @@ import { Briefcase, Plus, Search, Clock, CheckCircle2, FileText, User } from 'lu
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useNotification } from '../../contexts/NotificationContext';
 import { WorkAssignment, WorkPriority, WorkStatus, StaffProfile } from '../../types';
 import { createWorkAssignment, updateWorkAssignmentStatus } from '../../services/firestoreService';
 import { orderBy } from 'firebase/firestore';
@@ -19,6 +20,7 @@ import { orderBy } from 'firebase/firestore';
 export const WorkAssignmentPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { can, isDirector } = usePermissions();
+  const { showToast } = useNotification();
   const { data: assignments, loading } = useRealtimeCollection<WorkAssignment>('workAssignments', [
     orderBy('createdAt', 'desc'),
   ]);
@@ -82,7 +84,7 @@ export const WorkAssignmentPage: React.FC = () => {
       setDescription('');
       setVoiceNoteUrl('');
       setAttachmentUrl('');
-      alert('Work assignment dispatched successfully.');
+      showToast('Work assignment dispatched successfully.', 'success');
     } catch (err: any) {
       console.error('Work creation error:', err);
       setError('Failed to dispatch work assignment. Secure with Janta Live Setu.');
@@ -96,9 +98,9 @@ export const WorkAssignmentPage: React.FC = () => {
     try {
       await updateWorkAssignmentStatus(workId, newStatus, proof);
       setSelectedWork(null);
-      alert(`Work status updated to ${newStatus}.`);
+      showToast(`Work status updated to ${newStatus.replace('_', ' ').toUpperCase()}.`, 'success');
     } catch (err) {
-      alert('Failed to update work status.');
+      showToast('Failed to update work status.', 'error');
     } finally {
       setSubmitting(false);
     }

@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useNotification } from '../../contexts/NotificationContext';
 import { saveStaffProfile, setUserDoc, getStaffProfileById } from '../../services/firestoreService';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
 import { StaffProfile } from '../../types';
@@ -25,6 +26,7 @@ export const ProfilePage: React.FC = () => {
   const { userDoc, staffProfile, refreshUserDoc } = useAuth();
   const { companySettings } = useCompany();
   const { isDirector } = usePermissions();
+  const { showToast } = useNotification();
 
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -106,13 +108,13 @@ export const ProfilePage: React.FC = () => {
     // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
     if (!validTypes.includes(file.type.toLowerCase())) {
-      alert('Please select a valid image file (JPG, PNG, or WEBP).');
+      showToast('Please select a valid image file (JPG, PNG, or WEBP).', 'warning');
       return;
     }
 
     // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
-      alert('Selected image size exceeds 10MB limit. Please select a smaller photo.');
+      showToast('Selected image size exceeds 10MB limit. Please select a smaller photo.', 'warning');
       return;
     }
 
@@ -175,7 +177,7 @@ export const ProfilePage: React.FC = () => {
           finalPhotoUrl = uploadRes.secureUrl || uploadRes.url;
         } catch (uploadErr) {
           console.error('Photo upload failed:', uploadErr);
-          alert('Unable to upload profile photo. Please try again.');
+          showToast('Unable to upload profile photo. Please try again.', 'error');
           setSubmitting(false);
           return;
         }
@@ -239,10 +241,10 @@ export const ProfilePage: React.FC = () => {
       setCroppedPreviewUrl(null);
       await refreshUserDoc();
       setEditing(false);
-      alert('Profile updated successfully.');
+      showToast('Profile updated successfully.', 'success');
     } catch (err: any) {
       console.error('Failed to update profile:', err);
-      alert('Unable to update profile. Please try again.');
+      showToast('Unable to update profile. Please try again.', 'error');
     } finally {
       setSubmitting(false);
     }

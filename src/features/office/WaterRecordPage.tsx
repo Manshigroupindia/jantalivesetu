@@ -10,12 +10,14 @@ import { createWaterRecord } from '../../services/firestoreService';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { orderBy } from 'firebase/firestore';
 
 export const WaterRecordPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { companySettings } = useCompany();
+  const { showToast } = useNotification();
   const { data: records, loading } = useRealtimeCollection<WaterRecord>('waterRecords', [
     orderBy('createdAt', 'desc'),
   ]);
@@ -48,9 +50,9 @@ export const WaterRecordPage: React.FC = () => {
       });
 
       setBottlesCount(5);
-      alert('Water bottle record saved.');
+      showToast('Water bottle record saved.', 'success');
     } catch (err) {
-      alert('Failed to log water record.');
+      showToast('Failed to log water record.', 'error');
     } finally {
       setSubmitting(false);
     }

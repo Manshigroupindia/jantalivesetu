@@ -2,12 +2,14 @@ import React, { useState, useRef } from 'react';
 import { Mic, Square, Trash2, Upload, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export interface VoiceRecorderProps {
   onAudioUploaded: (audioUrl: string) => void;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onAudioUploaded }) => {
+  const { showToast } = useNotification();
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onAudioUploaded })
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err) {
-      alert('Microphone access denied or unavailable.');
+      showToast('Microphone access denied or unavailable.', 'error');
     }
   };
 
@@ -68,7 +70,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onAudioUploaded })
       setUploadedUrl(res.secureUrl);
       onAudioUploaded(res.secureUrl);
     } catch (err: any) {
-      alert(err.message || 'Voice note upload failed.');
+      showToast(err.message || 'Voice note upload failed.', 'error');
     } finally {
       setUploading(false);
     }
