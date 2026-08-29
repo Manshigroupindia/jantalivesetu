@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { SecurityProvider } from './contexts/SecurityContext';
+import { PWAProvider } from './contexts/PWAContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -57,7 +58,8 @@ export const App: React.FC = () => {
           <AuthProvider>
             <CompanyProvider>
               <SecurityProvider>
-              <Routes>
+                <PWAProvider>
+                  <Routes>
                 {/* AUTH ROUTES */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/pending-approval" element={<PendingApprovalPage />} />
@@ -105,8 +107,8 @@ export const App: React.FC = () => {
                     </ProtectedRoute>
                   }
                 />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
+                </Routes>
+              </PWAProvider>
             </SecurityProvider>
           </CompanyProvider>
         </AuthProvider>

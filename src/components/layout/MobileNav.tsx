@@ -5,10 +5,14 @@ import {
   X,
   LogOut,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Lock,
+  Download
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSecurity } from '../../contexts/SecurityContext';
+import { usePWA } from '../../contexts/PWAContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { signOutUser } from '../../services/authService';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -18,6 +22,8 @@ export const MobileNav: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { companySettings } = useCompany();
   const { userDoc, staffProfile } = useAuth();
+  const { lockPinSession } = useSecurity();
+  const { isStandalone, triggerInstall } = usePWA();
   const { can, role, isDirector } = usePermissions();
   const { showConfirm } = useNotification();
   const location = useLocation();
@@ -206,6 +212,28 @@ export const MobileNav: React.FC = () => {
 
               {/* DRAWER FOOTER */}
               <div className="p-3 border-t border-gray-100 bg-gray-50/80 shrink-0 space-y-2">
+                {!isStandalone && (
+                  <button
+                    onClick={() => {
+                      setDrawerOpen(false);
+                      triggerInstall();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-brand-50 text-brand-700 border border-brand-200 text-xs font-bold hover:bg-brand-100 transition-colors shadow-sm active:scale-95"
+                  >
+                    <Download className="w-4 h-4" /> Install App
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    lockPinSession();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gray-100 text-gray-800 text-xs font-bold hover:bg-gray-200 transition-colors shadow-sm active:scale-95"
+                >
+                  <Lock className="w-4 h-4 text-gray-600" /> Lock Session
+                </button>
+
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors shadow-sm active:scale-95"

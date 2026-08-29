@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { usePWA } from '../../contexts/PWAContext';
 import { getCurrentDateISO, getCurrentTimeFormatted } from '../../utils/dateUtils';
-import { Lock, Clock, ShieldCheck } from 'lucide-react';
+import { Lock, Clock, ShieldCheck, Download } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { userDoc, staffProfile } = useAuth();
   const { lockPinSession } = useSecurity();
+  const { isStandalone, triggerInstall } = usePWA();
   const [timeStr, setTimeStr] = useState(getCurrentTimeFormatted());
 
   useEffect(() => {
@@ -38,17 +40,31 @@ export const Header: React.FC = () => {
 
       {/* RIGHT: ACTIONS & LOCK */}
       <div className="flex items-center gap-3">
-        {userDoc?.pinHash && (
+        {/* INSTALL APP BUTTON (PERMANENT WHEN NOT STANDALONE) */}
+        {!isStandalone && (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            icon={<Lock className="w-4 h-4 text-gray-500" />}
-            onClick={lockPinSession}
-            title="Lock Session with PIN"
+            icon={<Download className="w-4 h-4 text-brand-600" />}
+            onClick={triggerInstall}
+            className="text-xs font-bold text-gray-800 border-gray-200 hover:border-brand-500 hover:text-brand-600"
+            title="Install Janta Live Setu app on your desktop"
           >
-            Lock Session
+            Install App
           </Button>
         )}
+
+        {/* LOCK SESSION BUTTON */}
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Lock className="w-4 h-4 text-gray-500" />}
+          onClick={lockPinSession}
+          title="Lock Session with PIN"
+          className="text-xs font-bold text-gray-700 hover:text-red-600 hover:bg-red-50"
+        >
+          Lock Session
+        </Button>
 
         <div
           onClick={() => navigate('/profile')}

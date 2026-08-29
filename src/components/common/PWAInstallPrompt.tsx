@@ -2,43 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Download, X, Share } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useCompany } from '../../contexts/CompanyContext';
-
-// Proper TypeScript definition for BeforeInstallPromptEvent
-export interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
-}
+import { usePWA } from '../../contexts/PWAContext';
 
 const STORAGE_KEY_DISMISSED = 'jantaLiveSetuPWADismissedAt';
 const DISMISS_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 Hours temporary dismissal cooldown
 
 export const PWAInstallPrompt: React.FC = () => {
   const { companySettings } = useCompany();
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const { deferredPrompt, isStandalone, isIOS, isMobile, triggerInstall } = usePWA();
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
-  const [isIOS, setIsIOS] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
 
   useEffect(() => {
-    // 1. Detect Standalone Mode (Only hide if actually running inside standalone PWA window)
-    const checkStandalone = (): boolean => {
-      const isStandaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
-      const isNavStandalone = (navigator as any).standalone === true;
-      return isStandaloneMatch || isNavStandalone;
-    };
-
-    const standalone = checkStandalone();
-    setIsStandalone(standalone);
-    if (standalone) {
-      console.log('[PWA] App is running in standalone mode.');
-    }
-
-    // 2. Check 24-hour dismissal timestamp
+    // Check 24-hour dismissal timestamp
     const dismissedTime = localStorage.getItem(STORAGE_KEY_DISMISSED);
     if (dismissedTime) {
       const elapsed = Date.now() - parseInt(dismissedTime, 10);
@@ -49,35 +24,6 @@ export const PWAInstallPrompt: React.FC = () => {
         setIsDismissed(false);
       }
     }
-
-    // 3. Detect Device Platform
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const iosDevice = /iphone|ipad|ipod/.test(userAgent) && !(window as any).MSStream;
-    setIsIOS(iosDevice);
-    setIsMobile(window.innerWidth <= 768 || /mobile|android|touch/.test(userAgent));
-
-    // 4. Capture native beforeinstallprompt event
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      console.log('[PWA] beforeinstallprompt event captured successfully.');
-      const promptEvent = e as BeforeInstallPromptEvent;
-      setDeferredPrompt(promptEvent);
-    };
-
-    // 5. Capture native appinstalled event
-    const handleAppInstalled = () => {
-      console.log('[PWA] appinstalled event captured.');
-      setDeferredPrompt(null);
-      setIsStandalone(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
   }, []);
 
   // HIDE IF: Running in standalone mode OR user dismissed within 24 hours
@@ -89,27 +35,6 @@ export const PWAInstallPrompt: React.FC = () => {
   if (!deferredPrompt && !isIOS) {
     return null;
   }
-
-  // Trigger Native PWA Install Prompt
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-
-    try {
-      console.log('[PWA] Triggering native installation prompt...');
-      await deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      console.log(`[PWA] User choice outcome: ${choiceResult.outcome}`);
-      if (choiceResult.outcome === 'accepted') {
-        setDeferredPrompt(null);
-      } else {
-        handleDismiss();
-      }
-    } catch (err) {
-      console.error('[PWA] Error triggering install prompt:', err);
-    } finally {
-      setDeferredPrompt(null);
-    }
-  };
 
   // Handle Temporary Dismissal (×)
   const handleDismiss = () => {
@@ -160,7 +85,7 @@ export const PWAInstallPrompt: React.FC = () => {
               variant="primary"
               size="sm"
               icon={<Download className="w-3.5 h-3.5" />}
-              onClick={handleInstallClick}
+              onClick={triggerInstall}
               className="text-xs font-bold py-1.5 px-3 rounded-xl shadow-sm"
             >
               {isMobile ? 'Download App' : 'Install App'}

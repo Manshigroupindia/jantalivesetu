@@ -29,7 +29,9 @@ const SecurityContext = createContext<SecurityContextType>({
 
 export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userDoc } = useAuth();
-  const [isPinLocked, setIsPinLocked] = useState<boolean>(false);
+  const [isPinLocked, setIsPinLocked] = useState<boolean>(() => {
+    return sessionStorage.getItem('jantaLiveSetuSessionLocked') === 'true';
+  });
   const [pinModalOpen, setPinModalOpen] = useState<boolean>(false);
   const [reauthModalOpen, setReauthModalOpen] = useState<boolean>(false);
   const [activeActionName, setActiveActionName] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // When tab is hidden/switched away, lock PIN session according to security policy
-        setIsPinLocked(true);
+        lockPinSession();
       }
     };
 
@@ -52,9 +54,14 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [userDoc]);
 
-  const lockPinSession = () => setIsPinLocked(true);
+  const lockPinSession = () => {
+    setIsPinLocked(true);
+    sessionStorage.setItem('jantaLiveSetuSessionLocked', 'true');
+  };
+
   const unlockPinSession = () => {
     setIsPinLocked(false);
+    sessionStorage.removeItem('jantaLiveSetuSessionLocked');
     setPinModalOpen(false);
   };
 
