@@ -31,7 +31,7 @@ export function isStaffMemberActive(p?: Partial<StaffProfile> | null, u?: Partia
   if (u) {
     if (u.role === 'director') return false;
     if (u.approved === false) return false;
-    if (u.isDeleted === true || (u as any).deleted === true || u.deletedAt != null || u.isSuspended === true) return false;
+    if ((u as any).isDeleted === true || (u as any).deleted === true || u.deletedAt != null || u.isSuspended === true) return false;
 
     const uStatus = (u.status as string)?.toLowerCase();
     if (uStatus && inactiveStatuses.includes(uStatus)) return false;

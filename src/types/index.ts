@@ -33,6 +33,8 @@ export interface User {
   bio?: string;
   monthlySalary?: number;
   isSuspended?: boolean;
+  isDeleted?: boolean;
+  deleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
   previousStatus?: StaffApprovalStatus;
