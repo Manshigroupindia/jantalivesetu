@@ -1,4 +1,4 @@
-const CACHE_NAME = 'janta-live-setu-v2';
+const CACHE_NAME = 'janta-live-setu-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const STATIC_ASSETS = [
   '/pwa-192.png',
   '/pwa-512.png',
   '/pwa-maskable-512.png',
+  '/manifest.json',
   '/manifest.webmanifest'
 ];
 
