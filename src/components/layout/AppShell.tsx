@@ -6,6 +6,7 @@ import { LockScreen } from '../security/LockScreen';
 import { PinVerificationModal } from '../security/PinVerificationModal';
 import { ReauthenticationModal } from '../security/ReauthenticationModal';
 import { PWAInstallPrompt } from '../common/PWAInstallPrompt';
+import { PWAInstallModal } from '../common/PWAInstallModal';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { usePWA } from '../../contexts/PWAContext';
 import { AlertCircle, X } from 'lucide-react';
@@ -19,8 +20,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {/* FULL SCREEN LOCK OVERLAY */}
         <LockScreen />
 
-        {/* PWA INSTALL BANNER */}
+        {/* PWA INSTALL BANNER & GUIDE MODAL */}
         <PWAInstallPrompt />
+        <PWAInstallModal />
 
         {/* PWA UNAVAILABLE TOAST */}
         {installMessage && (
