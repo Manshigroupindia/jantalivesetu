@@ -631,7 +631,7 @@ export async function updateManualAttendance(
     checkIn: data.status === 'absent' ? '' : data.checkIn || existingData.checkIn || '09:00 AM',
     checkOut: data.status === 'absent' ? '' : data.checkOut || existingData.checkOut || '06:00 PM',
     totalMinutes,
-    attendanceType: existingData.attendanceType || 'NORMAL',
+    attendanceType: existingData.attendanceType || 'REGULAR',
     isManuallyEdited: true,
     isEdited: true,
     isAutoClosed: false,
@@ -646,8 +646,9 @@ export async function updateManualAttendance(
   };
 
   if (data.status === 'absent') {
-    updateFields.checkInLocation = { latitude: 0, longitude: 0 };
-    updateFields.checkOutLocation = { latitude: 0, longitude: 0 };
+    const emptyLoc: LocationRecord = { latitude: 0, longitude: 0, accuracy: 0, capturedAt: new Date().toISOString() };
+    updateFields.checkInLocation = emptyLoc;
+    updateFields.checkOutLocation = emptyLoc;
   }
 
   await updateDoc(currentDocRef, updateFields);
