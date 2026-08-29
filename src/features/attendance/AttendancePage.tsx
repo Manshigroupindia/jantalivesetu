@@ -122,6 +122,26 @@ export const AttendancePage: React.FC = () => {
     setManualModalOpen(true);
   };
 
+  const handleOpenEditFromCalendar = (record?: AttendanceRecord, dateStr?: string) => {
+    if (record) {
+      handleOpenEditManual(record);
+    } else {
+      setEditingRecord(null);
+      setSelectedStaffId(selectedDirectorStaffId || activeStaffList[0]?.userId || '');
+      setManualDate(dateStr || getCurrentDateISO());
+      setAttendanceStatus('present');
+      setInHour('09');
+      setInMinute('30');
+      setInPeriod('AM');
+      setOutHour('06');
+      setOutMinute('00');
+      setOutPeriod('PM');
+      setLocationText('Head Office, Patna');
+      setManualReason('');
+      setManualModalOpen(true);
+    }
+  };
+
   const handleOpenEditManual = (log: AttendanceRecord) => {
     setEditingRecord(log);
     setSelectedStaffId(log.userId);
@@ -295,6 +315,7 @@ export const AttendancePage: React.FC = () => {
           staffList={activeStaffList}
           onSelectStaffId={(id) => setSelectedDirectorStaffId(id)}
           onOpenManualModal={canManageAttendance ? handleOpenAddManual : undefined}
+          onEditAttendance={canManageAttendance ? handleOpenEditFromCalendar : undefined}
         />
       )}
 
@@ -347,7 +368,8 @@ export const AttendancePage: React.FC = () => {
                   <tbody className="divide-y divide-gray-100">
                     {filteredLogs.map((log) => {
                       const isAutoClosed = log.status === 'auto_closed' || log.isAutoClosed;
-                      const isManual = log.attendanceType === 'MANUAL' || log.isManuallyEdited;
+                      const isManual = log.attendanceType === 'MANUAL';
+                      const isEdited = log.isManuallyEdited || Boolean(log.editedByName);
                       const isAbsent = log.status === 'absent';
                       const isHalfDay = log.status === 'half_day' || log.payableFraction === 0.5 || isHalfDayCheckIn(log.checkIn);
 
@@ -397,9 +419,19 @@ export const AttendancePage: React.FC = () => {
                                 </Badge>
                               )}
 
-                              {isManual && (
+                              {isManual ? (
                                 <Badge variant="brand" size="sm" className="bg-purple-100 text-purple-800 border-purple-200 font-bold">
-                                  ✎ MANUAL
+                                  MANUAL
+                                </Badge>
+                              ) : (
+                                <Badge variant="neutral" size="sm" className="bg-gray-100 text-gray-700 font-bold">
+                                  NORMAL
+                                </Badge>
+                              )}
+
+                              {isEdited && (
+                                <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-900 border-amber-300 font-bold">
+                                  ✎ EDITED
                                 </Badge>
                               )}
                             </div>
@@ -443,14 +475,27 @@ export const AttendancePage: React.FC = () => {
                           </td>
                           {canManageAttendance && (
                             <td className="py-3.5 px-4 text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                icon={<Edit3 className="w-3.5 h-3.5" />}
-                                onClick={() => handleOpenEditManual(log)}
-                              >
-                                Edit
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedDirectorStaffId(log.userId);
+                                    setSelectedDate(log.date);
+                                    setActiveTab('calendar');
+                                  }}
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  icon={<Edit3 className="w-3.5 h-3.5" />}
+                                  onClick={() => handleOpenEditManual(log)}
+                                >
+                                  Edit
+                                </Button>
+                              </div>
                             </td>
                           )}
                         </tr>

@@ -631,8 +631,10 @@ export async function updateManualAttendance(
     checkIn: data.status === 'absent' ? '' : data.checkIn || existingData.checkIn || '09:00 AM',
     checkOut: data.status === 'absent' ? '' : data.checkOut || existingData.checkOut || '06:00 PM',
     totalMinutes,
-    attendanceType: 'MANUAL',
+    attendanceType: existingData.attendanceType || 'NORMAL',
     isManuallyEdited: true,
+    isEdited: true,
+    isAutoClosed: false,
     editedBy: data.editedById,
     editedByName: data.editedByName,
     editedAt: new Date().toISOString(),
@@ -642,6 +644,11 @@ export async function updateManualAttendance(
     previousStatus: data.status !== previousStatus ? previousStatus : existingData.previousStatus,
     updatedAt: new Date().toISOString(),
   };
+
+  if (data.status === 'absent') {
+    updateFields.checkInLocation = { latitude: 0, longitude: 0 };
+    updateFields.checkOutLocation = { latitude: 0, longitude: 0 };
+  }
 
   await updateDoc(currentDocRef, updateFields);
 }

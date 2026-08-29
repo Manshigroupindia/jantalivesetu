@@ -19,6 +19,7 @@ interface StaffAttendanceCalendarProps {
   staffList?: StaffProfile[];
   onSelectStaffId?: (id: string) => void;
   onOpenManualModal?: () => void;
+  onEditAttendance?: (record?: AttendanceRecord, dateStr?: string) => void;
 }
 
 export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = ({
@@ -28,6 +29,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
   staffList = [],
   onSelectStaffId,
   onOpenManualModal,
+  onEditAttendance,
 }) => {
   const todayISO = getCurrentDateISO();
   const [selectedMonth, setSelectedMonth] = useState<string>(todayISO.substring(0, 7)); // YYYY-MM
@@ -455,6 +457,26 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                     </div>
                   )}
 
+                  {/* SOURCE AND EDIT AUDIT BADGES */}
+                  <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold py-1 border-b border-gray-100">
+                    <span className="text-gray-500 uppercase">Source:</span>
+                    {selectedDayDetail.attendance.attendanceType === 'MANUAL' ? (
+                      <Badge variant="brand" size="sm" className="bg-purple-100 text-purple-800">
+                        MANUAL
+                      </Badge>
+                    ) : (
+                      <Badge variant="neutral" size="sm" className="bg-gray-100 text-gray-800">
+                        NORMAL (Duty Button)
+                      </Badge>
+                    )}
+
+                    {(selectedDayDetail.attendance.isManuallyEdited || selectedDayDetail.attendance.editedByName) && (
+                      <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-900 border-amber-300">
+                        ✎ EDITED
+                      </Badge>
+                    )}
+                  </div>
+
                   {selectedDayDetail.attendance.attendanceType === 'MANUAL' && (
                     <div className="bg-purple-50 p-3 rounded-xl border border-purple-200 space-y-1">
                       <p className="text-xs font-bold text-purple-900 flex items-center gap-1">
@@ -468,6 +490,24 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                       {selectedDayDetail.attendance.createdByName && (
                         <p className="text-[11px] text-purple-700">
                           <strong>Added by:</strong> {selectedDayDetail.attendance.createdByName}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedDayDetail.attendance.editedByName && (
+                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 space-y-1 text-xs text-amber-900">
+                      <p className="font-bold flex items-center gap-1">
+                        ✎ Edited by Director ({selectedDayDetail.attendance.editedByName})
+                      </p>
+                      {selectedDayDetail.attendance.editedAt && (
+                        <p className="text-[11px] text-amber-800">
+                          <strong>Edited On:</strong> {new Date(selectedDayDetail.attendance.editedAt).toLocaleString()}
+                        </p>
+                      )}
+                      {selectedDayDetail.attendance.editReason && (
+                        <p className="text-[11px] text-amber-800">
+                          <strong>Reason:</strong> {selectedDayDetail.attendance.editReason}
                         </p>
                       )}
                     </div>
@@ -526,10 +566,25 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
               </div>
             )}
 
-            <div className="flex justify-end pt-2">
+            <div className="flex gap-2 pt-2">
               <Button variant="outline" size="sm" onClick={() => setSelectedDayDetail(null)} className="w-full justify-center">
                 Close
               </Button>
+              {canSelectStaff && onEditAttendance && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full justify-center bg-brand-600 hover:bg-brand-700"
+                  onClick={() => {
+                    const record = selectedDayDetail.attendance;
+                    const dateStr = selectedDayDetail.dateStr;
+                    setSelectedDayDetail(null);
+                    onEditAttendance(record, dateStr);
+                  }}
+                >
+                  {selectedDayDetail.attendance ? 'Edit Attendance' : '+ Add Attendance'}
+                </Button>
+              )}
             </div>
           </div>
         </Modal>
