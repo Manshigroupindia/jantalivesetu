@@ -13,22 +13,20 @@ export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-const STORAGE_KEY_INSTALLED = 'jantaLiveSetuPWAInstalled';
 const STORAGE_KEY_DISMISSED = 'jantaLiveSetuPWADismissedAt';
-const DISMISS_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days cooldown after manual dismiss
+const DISMISS_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 Hours temporary dismissal cooldown
 
 export const PWAInstallPrompt: React.FC = () => {
   const { companySettings } = useCompany();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
-  const [isInstalled, setIsInstalled] = useState<boolean>(false);
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
   useEffect(() => {
-    // 1. Detect Standalone Mode (Already installed & opened as PWA)
-    const checkStandalone = () => {
+    // 1. Detect Standalone Mode (Only hide if actually running inside standalone PWA window)
+    const checkStandalone = (): boolean => {
       const isStandaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
       const isNavStandalone = (navigator as any).standalone === true;
       return isStandaloneMatch || isNavStandalone;
@@ -36,12 +34,11 @@ export const PWAInstallPrompt: React.FC = () => {
 
     const standalone = checkStandalone();
     setIsStandalone(standalone);
+    if (standalone) {
+      console.log('[PWA] App is running in standalone mode.');
+    }
 
-    // 2. Check localStorage for permanent install state
-    const installedStorage = localStorage.getItem(STORAGE_KEY_INSTALLED) === 'true';
-    setIsInstalled(installedStorage);
-
-    // 3. Check dismissal timestamp
+    // 2. Check 24-hour dismissal timestamp
     const dismissedTime = localStorage.getItem(STORAGE_KEY_DISMISSED);
     if (dismissedTime) {
       const elapsed = Date.now() - parseInt(dismissedTime, 10);
@@ -53,24 +50,25 @@ export const PWAInstallPrompt: React.FC = () => {
       }
     }
 
-    // 4. Detect Mobile & iOS
+    // 3. Detect Device Platform
     const userAgent = window.navigator.userAgent.toLowerCase();
     const iosDevice = /iphone|ipad|ipod/.test(userAgent) && !(window as any).MSStream;
     setIsIOS(iosDevice);
     setIsMobile(window.innerWidth <= 768 || /mobile|android|touch/.test(userAgent));
 
-    // 5. Listen for beforeinstallprompt event
+    // 4. Capture native beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      console.log('[PWA] beforeinstallprompt event captured successfully.');
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
     };
 
-    // 6. Listen for appinstalled event
+    // 5. Capture native appinstalled event
     const handleAppInstalled = () => {
-      setIsInstalled(true);
+      console.log('[PWA] appinstalled event captured.');
       setDeferredPrompt(null);
-      localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+      setIsStandalone(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -82,37 +80,38 @@ export const PWAInstallPrompt: React.FC = () => {
     };
   }, []);
 
-  // If already running as PWA or installed or dismissed, DO NOT RENDER
-  if (isStandalone || isInstalled || isDismissed) {
+  // HIDE IF: Running in standalone mode OR user dismissed within 24 hours
+  if (isStandalone || isDismissed) {
     return null;
   }
 
-  // If no deferred prompt is available and not iOS, DO NOT RENDER
+  // HIDE IF: Neither deferredPrompt nor iOS instructions are applicable
   if (!deferredPrompt && !isIOS) {
     return null;
   }
 
-  // Handle PWA Installation Click
+  // Trigger Native PWA Install Prompt
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
 
     try {
+      console.log('[PWA] Triggering native installation prompt...');
       await deferredPrompt.prompt();
       const choiceResult = await deferredPrompt.userChoice;
+      console.log(`[PWA] User choice outcome: ${choiceResult.outcome}`);
       if (choiceResult.outcome === 'accepted') {
-        setIsInstalled(true);
-        localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+        setDeferredPrompt(null);
       } else {
         handleDismiss();
       }
     } catch (err) {
-      console.error('Error triggering PWA install prompt:', err);
+      console.error('[PWA] Error triggering install prompt:', err);
     } finally {
       setDeferredPrompt(null);
     }
   };
 
-  // Handle Dismissal (×)
+  // Handle Temporary Dismissal (×)
   const handleDismiss = () => {
     setIsDismissed(true);
     localStorage.setItem(STORAGE_KEY_DISMISSED, Date.now().toString());
