@@ -20,7 +20,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export const AttendancePage: React.FC = () => {
   const { userDoc, staffProfile: currentUserProfile } = useAuth();
-  const { isDirector } = usePermissions();
+  const { isDirector, isAdmin } = usePermissions();
+  const canViewAll = isDirector || isAdmin;
   const { requirePinVerification } = useSecurity();
   const { showToast } = useNotification();
 
@@ -37,7 +38,7 @@ export const AttendancePage: React.FC = () => {
   const [manualReason, setManualReason] = useState('');
   const [submittingManual, setSubmittingManual] = useState(false);
 
-  const constraints = isDirector
+  const constraints = canViewAll
     ? []
     : [where('userId', '==', userDoc?.uid || 'none')];
 
@@ -128,7 +129,7 @@ export const AttendancePage: React.FC = () => {
           </p>
         </div>
 
-        {isDirector && (
+        {canViewAll && (
           <Button
             variant="primary"
             icon={<PlusCircle className="w-4 h-4" />}

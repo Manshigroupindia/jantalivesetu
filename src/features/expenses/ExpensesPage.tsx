@@ -22,7 +22,8 @@ import { where } from 'firebase/firestore';
 export const ExpensesPage: React.FC = () => {
   const navigate = useNavigate();
   const { userDoc, staffProfile } = useAuth();
-  const { isDirector } = usePermissions();
+  const { isDirector, isAdmin } = usePermissions();
+  const canViewAll = isDirector || isAdmin;
   const { requirePinVerification } = useSecurity();
   const { showToast, showPrompt } = useNotification();
 
@@ -43,7 +44,7 @@ export const ExpensesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Firestore Expense Query Constraint
-  const expenseConstraints = isDirector
+  const expenseConstraints = canViewAll
     ? []
     : [where('userId', '==', userDoc?.uid || 'none')];
 

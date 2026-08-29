@@ -1,34 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Briefcase,
-  MessageSquare,
-  Clock,
-  Receipt,
-  Coffee,
-  Droplet,
-  Zap,
-  DollarSign,
-  Users,
-  Building,
-  Sparkles,
-  ShieldCheck,
-  Bell,
-  CalendarDays,
-  FileBarChart,
-  Settings,
-  FolderGit2,
-  Lock,
-  User,
-  LogOut
-} from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOutUser } from '../../services/authService';
-
 import { useNotification } from '../../contexts/NotificationContext';
+import { ALL_NAV_ITEMS, CATEGORY_LABELS, NavCategory } from '../../config/navigation';
 
 export const Sidebar: React.FC = () => {
   const { companySettings } = useCompany();
@@ -49,28 +27,15 @@ export const Sidebar: React.FC = () => {
     });
   };
 
-  const navItems = [
-    { label: 'My Profile', path: '/profile', icon: User, show: true },
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, show: can('dashboard.view') },
-    { label: 'My Work', path: '/work', icon: Briefcase, show: can('work.viewOwn') },
-    { label: 'Chat', path: '/chat', icon: MessageSquare, show: can('chat.use') },
-    { label: 'Attendance', path: '/attendance', icon: Clock, show: can('attendance.viewOwn') },
-    { label: 'Expenses', path: '/expenses', icon: Receipt, show: can('expense.viewOwn') },
-    { label: 'Tea / Snacks', path: '/tea-snacks', icon: Coffee, show: can('tea.create') },
-    { label: 'Water Record', path: '/water', icon: Droplet, show: can('water.create') },
-    { label: 'Electricity', path: '/electricity', icon: Zap, show: can('electricity.create') },
-    { label: 'Salary Engine', path: '/salary', icon: DollarSign, show: can('salary.viewOwn') },
-    { label: 'Staff Entry', path: '/staff', icon: Users, show: can('staff.view') },
-    { label: 'Office Rent', path: '/office/rent', icon: Building, show: can('rent.manage') },
-    { label: 'Cleanliness', path: '/office/cleanliness', icon: Sparkles, show: can('cleaning.manage') },
-    { label: 'Toilet Cleaning', path: '/office/toilet-cleaning', icon: ShieldCheck, show: can('cleaning.manage') },
-    { label: 'Notice Board', path: '/notices', icon: Bell, show: true },
-    { label: 'Holidays', path: '/holidays', icon: CalendarDays, show: true },
-    { label: 'Reports', path: '/reports', icon: FileBarChart, show: can('reports.view') },
-    { label: 'Audit Logs', path: '/audit', icon: Lock, show: isDirector },
-    { label: 'Client Directory', path: '/clients', icon: FolderGit2, show: true },
-    { label: 'CMS Settings', path: '/settings', icon: Settings, show: can('settings.manage') },
-  ];
+  // Filter items based on single-source permissions
+  const authorizedItems = ALL_NAV_ITEMS.filter((item) => {
+    if (item.isDirectorOnly) return isDirector;
+    if (item.permission) return can(item.permission);
+    return true;
+  });
+
+  // Group authorized items by category
+  const categories: NavCategory[] = ['main', 'office', 'management', 'facilities', 'system'];
 
   return (
     <aside className="w-64 bg-white border-r border-gray-100 flex flex-col h-screen sticky top-0 hidden md:flex shrink-0 shadow-sm z-20">
@@ -100,28 +65,38 @@ export const Sidebar: React.FC = () => {
       )}
 
       {/* NAVIGATION ITEMS */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {navItems
-          .filter((item) => item.show)
-          .map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 ${
-                    isActive
-                      ? 'bg-brand-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`
-                }
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </NavLink>
-            );
-          })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        {categories.map((cat) => {
+          const categoryItems = authorizedItems.filter((item) => item.category === cat);
+          if (categoryItems.length === 0) return null;
+
+          return (
+            <div key={cat} className="space-y-1">
+              <p className="px-3 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2">
+                {CATEGORY_LABELS[cat]}
+              </p>
+              {categoryItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 ${
+                        isActive
+                          ? 'bg-brand-600 text-white shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`
+                    }
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          );
+        })}
       </nav>
 
       {/* USER FOOTER */}

@@ -20,7 +20,8 @@ import { useNotification } from '../../contexts/NotificationContext';
 
 export const SalaryPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
-  const { isDirector } = usePermissions();
+  const { isDirector, isAdmin } = usePermissions();
+  const canViewAll = isDirector || isAdmin;
   const { requirePinVerification } = useSecurity();
   const { showToast } = useNotification();
 
@@ -38,12 +39,12 @@ export const SalaryPage: React.FC = () => {
   const { data: holidays = [] } = useRealtimeCollection<CompanyHoliday>('holidays');
 
   useEffect(() => {
-    if (!isDirector && staffProfile) {
+    if (!canViewAll && staffProfile) {
       setSelectedStaffId(staffProfile.userId);
     } else if (staffList.length > 0 && !selectedStaffId) {
       setSelectedStaffId(staffList[0].userId);
     }
-  }, [staffList, staffProfile, isDirector]);
+  }, [staffList, staffProfile, canViewAll]);
 
   useEffect(() => {
     if (!selectedStaffId) return;
@@ -182,7 +183,7 @@ export const SalaryPage: React.FC = () => {
           onChange={(e) => setSelectedMonth(e.target.value)}
         />
 
-        {isDirector && (
+        {canViewAll && (
           <Select
             label="Select Staff Member"
             value={selectedStaffId}
