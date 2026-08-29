@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { DutyCard } from '../dashboard/components/DutyCard';
 import { GoogleMapsButton } from '../../components/common/GoogleMapsButton';
-import { Clock, Calendar, Search, PlusCircle, UserCheck } from 'lucide-react';
+import { Clock, Calendar, Search, PlusCircle } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AttendanceRecord, StaffProfile } from '../../types';
 import { getCurrentDateISO } from '../../utils/dateUtils';

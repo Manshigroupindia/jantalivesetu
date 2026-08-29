@@ -16,7 +16,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { getCurrentMonthKey } from '../../utils/dateUtils';
 import { where } from 'firebase/firestore';
-import { ArrowLeft, Receipt, Clock, UserCheck, Calendar, FileText, CheckCircle2, AlertTriangle, User } from 'lucide-react';
+import { ArrowLeft, Receipt, Clock, FileText, User } from 'lucide-react';
 
 export const StaffExpenseDetailPage: React.FC = () => {
   const { staffId } = useParams<{ staffId: string }>();

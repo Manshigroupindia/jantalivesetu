@@ -15,6 +15,8 @@ export function getCurrentMonthISO(): string {
   return `${year}-${month}`;
 }
 
+export const getCurrentMonthKey = getCurrentMonthISO;
+
 export function getCurrentTimeFormatted(): string {
   return new Date().toLocaleTimeString('en-IN', {
     hour: '2-digit',

@@ -102,6 +102,7 @@ export function calculateSalaryBreakdown(
     const dateObj = new Date(year, monthIdx, day);
     const isSunday = dateObj.getDay() === 0;
     const isCompanyHoliday = holidaySet.has(dateStr);
+    const attendance = attendanceMap.get(dateStr);
     const isWorkedDay = attendance && (
       attendance.status === 'present' ||
       attendance.status === 'on_duty' ||
