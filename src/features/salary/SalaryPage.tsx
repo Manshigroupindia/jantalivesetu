@@ -261,24 +261,43 @@ export const SalaryPage: React.FC = () => {
                 <span className="font-medium text-gray-700">Present Days:</span>
                 <span className="font-bold text-gray-900">{breakdown.presentDays} days</span>
               </div>
+
               <div className="flex justify-between p-2 rounded-lg bg-gray-50">
-                <span className="font-medium text-gray-700">Paid Sundays:</span>
+                <span className="font-medium text-gray-700">Paid Sundays (Max 4):</span>
                 <span className="font-bold text-emerald-600">+{breakdown.sundaysCount} days</span>
               </div>
+
+              {Boolean(breakdown.fifthSundayCount && breakdown.fifthSundayCount > 0) && (
+                <div className="flex justify-between p-2 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 font-semibold">
+                  <span>5th Sunday — Neutral (No Pay / No Deduction):</span>
+                  <span>{breakdown.fifthSundayCount} day</span>
+                </div>
+              )}
+
+              {Boolean(breakdown.has31stNeutralDay) && (
+                <div className="flex justify-between p-2 rounded-lg bg-blue-50 text-blue-900 border border-blue-200 font-semibold">
+                  <span>31st Calendar Day — Neutral (30-Day Model):</span>
+                  <span>1 day</span>
+                </div>
+              )}
+
               <div className="flex justify-between p-2 rounded-lg bg-gray-50">
                 <span className="font-medium text-gray-700">Paid Company Holidays:</span>
                 <span className="font-bold text-emerald-600">+{breakdown.paidHolidaysCount} days</span>
               </div>
+
               <div className="flex justify-between p-2 rounded-lg bg-purple-50 text-purple-900 border border-purple-100">
                 <span className="font-bold text-purple-900">Paid Emergency Holiday:</span>
                 <span className="font-extrabold text-purple-700">
                   +{breakdown.emergencyLeaveCount} {breakdown.emergencyLeaveCount === 1 ? 'day' : 'days'}
                 </span>
               </div>
+
               <div className="flex justify-between p-2 rounded-lg bg-red-50 text-red-700 font-semibold">
                 <span>Unpaid Leave / Absent Days:</span>
                 <span>{breakdown.unpaidLeaves ?? breakdown.absentDays} days (-{formatINR(breakdown.absentDeduction)})</span>
               </div>
+
               <div className="flex justify-between p-2.5 rounded-xl bg-emerald-100/70 text-emerald-950 font-black text-sm border border-emerald-300">
                 <span>Total Payable Days:</span>
                 <span>{breakdown.totalPayableDays} / 30 Days</span>

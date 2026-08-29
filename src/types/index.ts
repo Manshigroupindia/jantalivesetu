@@ -333,6 +333,11 @@ export interface SalaryCalculationResult {
   expenseReimbursements: number;
   finalTotalPayable: number;
 
+  fifthSundayCount?: number;
+  isFifthSundayNeutral?: boolean;
+  has31stNeutralDay?: boolean;
+  neutralDaysCount?: number;
+
   // Aliases
   baseSalary?: number;
   totalDaysInMonth?: number;

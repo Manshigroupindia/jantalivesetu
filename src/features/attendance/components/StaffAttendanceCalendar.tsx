@@ -38,6 +38,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
     status: 'present' | 'absent' | 'sunday' | 'holiday' | 'manual' | 'future';
     attendance?: AttendanceRecord;
     isSunday: boolean;
+    isFifthSunday?: boolean;
     isHoliday: boolean;
     holidayTitle?: string;
     isFuture: boolean;
@@ -91,6 +92,17 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
   // Convert Sunday (0) to 6 for Mon-Sun grid (Mon=0, Tue=1 ... Sun=6)
   const startingPadding = (firstDayOfWeek + 6) % 7;
 
+  // Deterministic Sunday calculation for selectedMonth
+  const sundayDates: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(year, monthIdx, d);
+    if (dt.getDay() === 0) {
+      sundayDates.push(`${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    }
+  }
+  const paidSundaySet = new Set(sundayDates.slice(0, 4));
+  const fifthSundaySet = new Set(sundayDates.slice(4));
+
   // Lookup maps
   const attendanceMap = new Map<string, AttendanceRecord>();
   attendanceLogs.forEach((a) => {
@@ -113,8 +125,9 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
     const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dateObj = new Date(year, monthIdx, day);
     const isSunday = dateObj.getDay() === 0;
+    const isFifthSunday = fifthSundaySet.has(dateStr);
     const isHoliday = holidayMap.has(dateStr);
-    const holidayTitle = holidayMap.get(dateStr);
+    const holidayTitle = isFifthSunday ? '5th Sunday — Neutral' : (holidayMap.get(dateStr) || (isSunday ? 'Paid Sunday' : ''));
     const attendance = attendanceMap.get(dateStr);
     const isFuture = dateStr > todayISO;
 
@@ -150,6 +163,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
       status,
       attendance,
       isSunday,
+      isFifthSunday,
       isHoliday,
       holidayTitle,
       dayName,
@@ -377,12 +391,23 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                 <h4 className="text-base font-black text-gray-900">{selectedDayDetail.dateStr}</h4>
               </div>
 
-              {selectedDayDetail.status === 'present' && <Badge variant="success" size="md">Present</Badge>}
-              {selectedDayDetail.status === 'manual' && <Badge variant="brand" size="md" className="bg-purple-100 text-purple-800">Manually Added</Badge>}
-              {selectedDayDetail.status === 'sunday' && <Badge variant="warning" size="md">Sunday</Badge>}
-              {selectedDayDetail.status === 'holiday' && <Badge variant="warning" size="md">Company Holiday</Badge>}
-              {selectedDayDetail.status === 'absent' && <Badge variant="danger" size="md">Absent</Badge>}
-              {selectedDayDetail.status === 'future' && <Badge variant="neutral" size="md">Future Date</Badge>}
+              <div className="flex flex-col items-end gap-1">
+                {selectedDayDetail.status === 'present' && <Badge variant="success" size="md">Present</Badge>}
+                {selectedDayDetail.status === 'manual' && <Badge variant="brand" size="md" className="bg-purple-100 text-purple-800">Manually Added</Badge>}
+                {selectedDayDetail.status === 'sunday' && (
+                  <Badge variant="warning" size="md">
+                    {selectedDayDetail.isFifthSunday ? '5th Sunday (Neutral)' : 'Paid Sunday'}
+                  </Badge>
+                )}
+                {selectedDayDetail.status === 'holiday' && <Badge variant="warning" size="md">Company Holiday</Badge>}
+                {selectedDayDetail.status === 'absent' && <Badge variant="danger" size="md">Absent</Badge>}
+                {selectedDayDetail.status === 'future' && <Badge variant="neutral" size="md">Future Date</Badge>}
+                {selectedDayDetail.dayNum === 31 && (
+                  <span className="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    30-Day Model: 31st Day Neutral
+                  </span>
+                )}
+              </div>
             </div>
 
             {selectedDayDetail.attendance ? (

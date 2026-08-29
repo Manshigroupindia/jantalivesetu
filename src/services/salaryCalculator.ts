@@ -16,12 +16,14 @@ export interface SalaryInputData {
  * 
  * Rules:
  * 1. Base Daily Rate = monthlySalary / 30.
- * 2. 30-day salary basis structure.
- * 3. Sundays are paid company holidays.
+ * 2. 30-day salary basis structure (Max base payable days = 30).
+ * 3. Maximum 4 Paid Sundays per month.
+ *    - First 4 Sundays are paid.
+ *    - 5th Sunday (if any) is NEUTRAL (0 pay addition, 0 deduction, outside 30-day basis).
  * 4. Configured company holidays are paid (no double counting on Sundays).
  * 5. 1 Emergency Leave per month is paid (0 deduction).
- * 6. Additional unpaid leaves deduct dailyRate per day.
- * 7. Cap total payable base salary at monthlySalary (e.g. 5th Sunday does not overpay).
+ * 6. 31st calendar day is NEUTRAL for salary calculation (0 pay addition, 0 deduction).
+ * 7. Unpaid absence deducts dailyRate per day from 30-day salary basis.
  */
 export function calculateSalaryBreakdown(
   monthlySalaryOrInput: number | SalaryInputData,
@@ -69,6 +71,24 @@ export function calculateSalaryBreakdown(
   const dailyRate = Math.round((monthlySalary / 30) * 100) / 100;
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
 
+  // 1. Identify all Sundays in the month deterministically by calendar date
+  const sundayDates: string[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateObj = new Date(year, monthIdx, day);
+    if (dateObj.getDay() === 0) {
+      const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      sundayDates.push(dateStr);
+    }
+  }
+
+  const totalSundaysInMonth = sundayDates.length;
+  // Maximum 4 Sundays are paid (first 4 chronologically)
+  const paidSundaySet = new Set(sundayDates.slice(0, 4));
+  const fifthSundaySet = new Set(sundayDates.slice(4));
+
+  const fifthSundayCount = fifthSundaySet.size;
+  const isFifthSundayNeutral = fifthSundayCount > 0;
+
   // Create attendance lookup by date (YYYY-MM-DD)
   const attendanceMap = new Map<string, AttendanceRecord>();
   if (Array.isArray(attendanceRecords)) {
@@ -79,7 +99,7 @@ export function calculateSalaryBreakdown(
     });
   }
 
-  // Create holiday lookup by date
+  // Create holiday lookup by date (avoid double counting with Sundays)
   const holidaySet = new Set<string>();
   if (Array.isArray(holidays)) {
     holidays.forEach((h) => {
@@ -96,13 +116,16 @@ export function calculateSalaryBreakdown(
   let paidHolidays = 0;
   let emergencyLeavesUsed = 0;
   let unpaidLeaves = 0;
+  let neutralDaysCount = 0;
+  let has31stNeutralDay = false;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dateObj = new Date(year, monthIdx, day);
-    const isSunday = dateObj.getDay() === 0;
+    const isPaidSunday = paidSundaySet.has(dateStr);
+    const isFifthSunday = fifthSundaySet.has(dateStr);
     const isCompanyHoliday = holidaySet.has(dateStr);
     const attendance = attendanceMap.get(dateStr);
+
     const isWorkedDay = attendance && (
       attendance.status === 'present' ||
       attendance.status === 'on_duty' ||
@@ -113,6 +136,20 @@ export function calculateSalaryBreakdown(
       Boolean(attendance.checkIn)
     );
 
+    // Rule for 5th Sunday: Neutral (0 pay addition, 0 deduction)
+    if (isFifthSunday) {
+      neutralDaysCount++;
+      continue;
+    }
+
+    // Rule for 31st Calendar Day:
+    // Neutral for 30-day salary model calculation (0 pay addition, 0 deduction)
+    if (day === 31) {
+      has31stNeutralDay = true;
+      neutralDaysCount++;
+      continue;
+    }
+
     if (isWorkedDay) {
       workedDays++;
     } else if (attendance && attendance.status === 'paid_leave') {
@@ -121,12 +158,12 @@ export function calculateSalaryBreakdown(
       } else {
         unpaidLeaves++;
       }
-    } else if (isSunday) {
+    } else if (isPaidSunday) {
       paidSundays++;
     } else if (isCompanyHoliday) {
       paidHolidays++;
     } else {
-      // Absent or unrecorded working day
+      // Absent on standard working day
       unpaidLeaves++;
     }
   }
@@ -143,13 +180,13 @@ export function calculateSalaryBreakdown(
   // Cap total paid units at 30 days for 30-day salary basis
   const cappedPaidUnits = Math.min(30, totalPaidDaysUnits);
 
-  // Deducted days from 30-day standard
+  // Deducted days from 30-day standard basis
   const deductedDays = Math.max(0, 30 - cappedPaidUnits);
   const salaryDeductionAmount = Math.round(deductedDays * dailyRate);
 
   let earnedSalary = Math.round(cappedPaidUnits * dailyRate);
 
-  // If staff completed full attendance/payable units, set to full monthly base salary
+  // If staff completed full attendance/payable units (30), set to exact monthly base salary
   if (cappedPaidUnits >= 30) {
     earnedSalary = monthlySalary;
   } else if (deductedDays > 0) {
@@ -176,6 +213,11 @@ export function calculateSalaryBreakdown(
     earnedSalary,
     expenseReimbursements: approvedExpensesTotal,
     finalTotalPayable,
+
+    fifthSundayCount,
+    isFifthSundayNeutral,
+    has31stNeutralDay,
+    neutralDaysCount,
 
     // Aliases for UI Components & SalaryPage
     baseSalary: monthlySalary,
