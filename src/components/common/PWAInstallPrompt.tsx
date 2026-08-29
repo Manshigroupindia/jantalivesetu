@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Share, CheckCircle2 } from 'lucide-react';
+import { Download, X, Share } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 // Proper TypeScript definition for BeforeInstallPromptEvent
@@ -53,7 +53,7 @@ export const PWAInstallPrompt: React.FC = () => {
 
     // 4. Detect Mobile & iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const iosDevice = /iphone|ipad|ipod/.test(userAgent) && !window.MSStream;
+    const iosDevice = /iphone|ipad|ipod/.test(userAgent) && !(window as any).MSStream;
     setIsIOS(iosDevice);
     setIsMobile(window.innerWidth <= 768 || /mobile|android|touch/.test(userAgent));
 
