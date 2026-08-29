@@ -4,12 +4,16 @@ import { Header } from './Header';
 import { MobileNav } from './MobileNav';
 import { PinVerificationModal } from '../security/PinVerificationModal';
 import { ReauthenticationModal } from '../security/ReauthenticationModal';
+import { PWAInstallPrompt } from '../common/PWAInstallPrompt';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-surface-bg flex flex-col md:flex-row text-gray-900 selection:bg-brand-500 selection:text-white">
+        {/* PWA INSTALL BANNER */}
+        <PWAInstallPrompt />
+
         {/* DESKTOP SIDEBAR */}
         <Sidebar />
 
