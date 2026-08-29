@@ -21,7 +21,7 @@ export const StaffDetailPage: React.FC = () => {
   const { companySettings } = useCompany();
   const { userDoc: currentUser } = useAuth();
   const { requirePinVerification } = useSecurity();
-  const { showToast, showAlert } = useNotification();
+  const { showToast } = useNotification();
 
   const [staff, setStaff] = useState<StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
