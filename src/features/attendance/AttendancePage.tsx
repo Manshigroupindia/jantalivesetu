@@ -113,13 +113,22 @@ export const AttendancePage: React.FC = () => {
                         : '—'}
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      {log.checkInLocation && (
-                        <GoogleMapsButton
-                          latitude={log.checkInLocation.latitude}
-                          longitude={log.checkInLocation.longitude}
-                          label="GPS Map"
-                        />
-                      )}
+                      <div className="flex flex-col sm:flex-row gap-1 justify-center items-center">
+                        {log.checkInLocation && (
+                          <GoogleMapsButton
+                            latitude={log.checkInLocation.latitude}
+                            longitude={log.checkInLocation.longitude}
+                            label="Check-In Map"
+                          />
+                        )}
+                        {log.checkOutLocation && (
+                          <GoogleMapsButton
+                            latitude={log.checkOutLocation.latitude}
+                            longitude={log.checkOutLocation.longitude}
+                            label="Check-Out Map"
+                          />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

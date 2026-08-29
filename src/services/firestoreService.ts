@@ -431,6 +431,7 @@ export async function recordDutyCheckOut(
     checkOut: checkOutTime,
     checkOutLocation,
     totalMinutes,
+    status: 'completed',
     updatedAt: new Date().toISOString(),
   });
 }

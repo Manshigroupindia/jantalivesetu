@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { MapPin, Clock, AlertCircle } from 'lucide-react';
 import { useGeolocation } from '../../../hooks/useGeolocation';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useNotification } from '../../../contexts/NotificationContext';
 import { recordDutyCheckIn, recordDutyCheckOut } from '../../../services/firestoreService';
 import { getCurrentDateISO, getCurrentTimeFormatted } from '../../../utils/dateUtils';
 import { GoogleMapsButton } from '../../../components/common/GoogleMapsButton';
@@ -13,6 +14,7 @@ import { db } from '../../../config/firebase';
 
 export const DutyCard: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
+  const { showToast } = useNotification();
   const { captureLocation, loading: geoLoading, error: geoError } = useGeolocation();
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -43,6 +45,16 @@ export const DutyCard: React.FC = () => {
 
   const handleDutyOn = async () => {
     if (!userDoc) return;
+
+    if (todayAttendance) {
+      if (todayAttendance.checkOut) {
+        showToast('Duty is already marked off for today.', 'info');
+        return;
+      }
+      showToast('You are already on duty.', 'info');
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
 
@@ -62,16 +74,31 @@ export const DutyCard: React.FC = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      showToast('Duty ON recorded successfully.', 'success');
     } catch (err: any) {
       console.error('Duty On error:', err);
-      setError(err.message || 'Failed to capture GPS location for Duty On.');
+      const isPermissionErr = err.code === 'permission-denied' || err.message?.includes('permission');
+      const errorMsg = isPermissionErr
+        ? 'Attendance permission is not configured correctly. Please contact the Director.'
+        : err.message || 'Failed to capture GPS location for Duty On.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDutyOff = async () => {
-    if (!todayAttendance) return;
+    if (!todayAttendance) {
+      showToast("Today's Duty On record could not be found. Please contact the Director.", 'error');
+      return;
+    }
+
+    if (todayAttendance.checkOut) {
+      showToast('Duty is already marked off for today.', 'info');
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
 
@@ -81,12 +108,21 @@ export const DutyCard: React.FC = () => {
 
       // Calculate total working minutes
       const now = new Date();
-      const totalMinutes = Math.max(30, Math.round((now.getTime() - new Date(todayAttendance.createdAt).getTime()) / 60000));
+      const createdTime = new Date(todayAttendance.createdAt).getTime();
+      const totalMinutes = !isNaN(createdTime)
+        ? Math.max(1, Math.round((now.getTime() - createdTime) / 60000))
+        : 30;
 
       await recordDutyCheckOut(todayAttendance.id, timeStr, loc, totalMinutes);
+      showToast('Duty OFF recorded successfully.', 'success');
     } catch (err: any) {
       console.error('Duty Off error:', err);
-      setError(err.message || 'Failed to capture GPS location for Duty Off.');
+      const isPermissionErr = err.code === 'permission-denied' || err.message?.includes('permission');
+      const errorMsg = isPermissionErr
+        ? 'Attendance permission is not configured correctly. Please contact the Director.'
+        : err.message || 'Failed to capture GPS location for Duty Off.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -137,17 +173,21 @@ export const DutyCard: React.FC = () => {
             <p className="text-xs font-bold text-emerald-800">
               Duty started at {todayAttendance.checkIn}
             </p>
-            <p className="text-[11px] text-emerald-700 font-medium">
-              Check-in location captured accurately (±{Math.round(todayAttendance.checkInLocation.accuracy)}m)
-            </p>
+            {todayAttendance.checkInLocation && (
+              <p className="text-[11px] text-emerald-700 font-medium">
+                Check-in location captured accurately (±{Math.round(todayAttendance.checkInLocation.accuracy)}m)
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2">
-            <GoogleMapsButton
-              latitude={todayAttendance.checkInLocation.latitude}
-              longitude={todayAttendance.checkInLocation.longitude}
-              label="View Check-In Map"
-            />
+            {todayAttendance.checkInLocation && (
+              <GoogleMapsButton
+                latitude={todayAttendance.checkInLocation.latitude}
+                longitude={todayAttendance.checkInLocation.longitude}
+                label="Check-In Map"
+              />
+            )}
             <Button
               variant="danger"
               size="md"
@@ -161,18 +201,39 @@ export const DutyCard: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-700">
-          <div className="flex justify-between">
-            <span className="font-medium text-gray-400">Shift Started:</span>
-            <span className="font-bold text-gray-900">{todayAttendance.checkIn}</span>
+        <div className="space-y-3">
+          <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-700">
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-400">Shift Started:</span>
+              <span className="font-bold text-gray-900">{todayAttendance.checkIn}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-400">Shift Ended:</span>
+              <span className="font-bold text-gray-900">{todayAttendance.checkOut}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t">
+              <span className="font-medium text-gray-400">Duration:</span>
+              <span className="font-bold text-emerald-600">
+                {Math.floor(todayAttendance.totalMinutes / 60)}h {todayAttendance.totalMinutes % 60}m
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="font-medium text-gray-400">Shift Ended:</span>
-            <span className="font-bold text-gray-900">{todayAttendance.checkOut}</span>
-          </div>
-          <div className="flex justify-between pt-1 border-t">
-            <span className="font-medium text-gray-400">Duration:</span>
-            <span className="font-bold text-emerald-600">{Math.floor(todayAttendance.totalMinutes / 60)}h {todayAttendance.totalMinutes % 60}m</span>
+
+          <div className="flex flex-wrap gap-2">
+            {todayAttendance.checkInLocation && (
+              <GoogleMapsButton
+                latitude={todayAttendance.checkInLocation.latitude}
+                longitude={todayAttendance.checkInLocation.longitude}
+                label="Check-In Map"
+              />
+            )}
+            {todayAttendance.checkOutLocation && (
+              <GoogleMapsButton
+                latitude={todayAttendance.checkOutLocation.latitude}
+                longitude={todayAttendance.checkOutLocation.longitude}
+                label="Check-Out Map"
+              />
+            )}
           </div>
         </div>
       )}

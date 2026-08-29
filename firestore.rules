@@ -66,7 +66,13 @@ service cloud.firestore {
     match /attendance/{attendanceId} {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isDirector() || (isAuthenticated() && resource.data.userId == request.auth.uid && resource.data.checkOut == null);
+      allow update: if isDirector() || isAdmin() || (
+        isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == resource.data.userId &&
+        (!('checkOut' in resource.data) || resource.data.checkOut == null) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkOut', 'checkOutLocation', 'totalMinutes', 'status', 'updatedAt'])
+      );
       allow delete: if isDirector();
     }
 

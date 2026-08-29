@@ -106,7 +106,7 @@ export interface AttendanceRecord {
   checkInLocation: LocationRecord;
   checkOutLocation?: LocationRecord;
   totalMinutes: number;
-  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'paid_leave';
+  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'completed' | 'paid_leave';
   createdAt: string;
   updatedAt: string;
 }
