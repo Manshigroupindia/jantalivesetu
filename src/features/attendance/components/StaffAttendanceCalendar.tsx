@@ -100,7 +100,6 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
       sundayDates.push(`${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
     }
   }
-  const paidSundaySet = new Set(sundayDates.slice(0, 4));
   const fifthSundaySet = new Set(sundayDates.slice(4));
 
   // Lookup maps

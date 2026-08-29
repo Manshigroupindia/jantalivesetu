@@ -81,7 +81,6 @@ export function calculateSalaryBreakdown(
     }
   }
 
-  const totalSundaysInMonth = sundayDates.length;
   // Maximum 4 Sundays are paid (first 4 chronologically)
   const paidSundaySet = new Set(sundayDates.slice(0, 4));
   const fifthSundaySet = new Set(sundayDates.slice(4));
