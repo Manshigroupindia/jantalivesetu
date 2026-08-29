@@ -10,7 +10,7 @@ import { GoogleMapsButton } from '../../components/common/GoogleMapsButton';
 import { StaffAttendanceCalendar } from './components/StaffAttendanceCalendar';
 import { Clock, Calendar as CalendarIcon, Search, PlusCircle, ListFilter, CalendarDays } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { AttendanceRecord, StaffProfile } from '../../types';
+import { AttendanceRecord } from '../../types';
 import { getCurrentDateISO } from '../../utils/dateUtils';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -54,6 +54,10 @@ export const AttendancePage: React.FC = () => {
   const [locationText, setLocationText] = useState('Head Office, Patna');
   const [manualReason, setManualReason] = useState('');
   const [submittingManual, setSubmittingManual] = useState(false);
+
+  const constraints = isDirector
+    ? []
+    : [where('userId', '==', userDoc?.uid || 'none')];
 
   const { data: rawAttendanceList, loading } = useRealtimeCollection<AttendanceRecord>('attendance', constraints);
   const { activeStaffList } = useActiveStaff();

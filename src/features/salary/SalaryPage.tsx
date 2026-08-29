@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { DollarSign, Lock, Edit3 } from 'lucide-react';
 import { calculateSalaryBreakdown } from '../../services/salaryCalculator';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { StaffProfile, AttendanceRecord, CompanyHoliday } from '../../types';
+import { AttendanceRecord, CompanyHoliday } from '../../types';
 import { formatINR } from '../../utils/formatters';
 import { formatMonthYear } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';

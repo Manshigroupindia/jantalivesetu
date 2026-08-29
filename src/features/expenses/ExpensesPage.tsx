@@ -9,7 +9,7 @@ import { Modal } from '../../components/ui/Modal';
 import { FileUploader } from '../../components/common/FileUploader';
 import { Receipt, Plus, Search, FileText, ArrowRight, User, Users, Calendar } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { ExpenseItem, StaffProfile } from '../../types';
+import { ExpenseItem } from '../../types';
 import { createExpenseItem, updateExpenseStatus } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';

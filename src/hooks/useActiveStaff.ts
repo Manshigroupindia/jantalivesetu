@@ -87,8 +87,12 @@ export function useActiveStaff(): UseActiveStaffResult {
         userId: uid,
         idNumber: u.idNumber || `JLS-${uid.slice(-4)}`,
         fullName: u.name || u.email?.split('@')[0] || 'Staff Member',
+        fatherName: '',
+        motherName: '',
         email: u.email || '',
         contactNumber: u.phone || 'N/A',
+        emergencyContact: '',
+        address: u.address || '',
         designation: u.designation || 'Staff Member',
         workingArea: u.city || 'Head Office',
         monthlySalary: u.monthlySalary || 0,
@@ -96,6 +100,10 @@ export function useActiveStaff(): UseActiveStaffResult {
         approvalStatus: (u.status as any) || 'approved',
         status: (u.status as any) || 'approved',
         joinedDate: u.createdAt ? u.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+        validUpto: '31 DEC 2028',
+        createdById: 'director',
+        createdAt: u.createdAt || new Date().toISOString(),
+        updatedAt: u.updatedAt || new Date().toISOString(),
       });
     }
   });

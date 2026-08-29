@@ -13,7 +13,7 @@ import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useNotification } from '../../contexts/NotificationContext';
-import { WorkAssignment, WorkPriority, WorkStatus, StaffProfile } from '../../types';
+import { WorkAssignment, WorkPriority, WorkStatus } from '../../types';
 import { createWorkAssignment, updateWorkAssignmentStatus } from '../../services/firestoreService';
 import { orderBy } from 'firebase/firestore';
 import { useActiveStaff } from '../../hooks/useActiveStaff';
@@ -21,6 +21,7 @@ import { useActiveStaff } from '../../hooks/useActiveStaff';
 export const WorkAssignmentPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { can, isDirector } = usePermissions();
+  const { showToast } = useNotification();
   const { data: assignments, loading } = useRealtimeCollection<WorkAssignment>('workAssignments', [
     orderBy('createdAt', 'desc'),
   ]);
