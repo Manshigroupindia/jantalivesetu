@@ -7,7 +7,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { DutyCard } from '../dashboard/components/DutyCard';
 import { GoogleMapsButton } from '../../components/common/GoogleMapsButton';
-import { Clock, Calendar, Search, PlusCircle } from 'lucide-react';
+import { StaffAttendanceCalendar } from './components/StaffAttendanceCalendar';
+import { Clock, Calendar as CalendarIcon, Search, PlusCircle, ListFilter, CalendarDays } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AttendanceRecord, StaffProfile } from '../../types';
 import { getCurrentDateISO } from '../../utils/dateUtils';
@@ -18,27 +19,41 @@ import { createManualAttendance, autoCloseStaleAttendance } from '../../services
 import { where } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
 export const AttendancePage: React.FC = () => {
   const { userDoc, staffProfile: currentUserProfile } = useAuth();
-  const { isDirector, isAdmin } = usePermissions();
-  const canViewAll = isDirector || isAdmin;
+  const { isDirector } = usePermissions();
   const { requirePinVerification } = useSecurity();
   const { showToast } = useNotification();
 
+  const [activeTab, setActiveTab] = useState<'calendar' | 'logs'>(isDirector ? 'logs' : 'calendar');
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateISO());
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [manualModalOpen, setManualModalOpen] = useState(false);
 
+  // Calendar Director Staff Filter
+  const [selectedDirectorStaffId, setSelectedDirectorStaffId] = useState<string>(userDoc?.uid || '');
+
   // Form State for Manual Attendance
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [manualDate, setManualDate] = useState(getCurrentDateISO());
-  const [checkInTime, setCheckInTime] = useState('09:30 AM');
-  const [checkOutTime, setCheckOutTime] = useState('06:00 PM');
+
+  // Time Picker Selectors
+  const [inHour, setInHour] = useState('09');
+  const [inMinute, setInMinute] = useState('30');
+  const [inPeriod, setInPeriod] = useState<'AM' | 'PM'>('AM');
+
+  const [outHour, setOutHour] = useState('06');
+  const [outMinute, setOutMinute] = useState('00');
+  const [outPeriod, setOutPeriod] = useState<'AM' | 'PM'>('PM');
+
   const [locationText, setLocationText] = useState('Head Office, Patna');
   const [manualReason, setManualReason] = useState('');
   const [submittingManual, setSubmittingManual] = useState(false);
 
-  const constraints = canViewAll
+  const constraints = isDirector
     ? []
     : [where('userId', '==', userDoc?.uid || 'none')];
 
@@ -46,6 +61,12 @@ export const AttendancePage: React.FC = () => {
   const { data: staffProfiles } = useRealtimeCollection<StaffProfile>('staffProfiles');
 
   const activeStaffList = staffProfiles.filter((s) => s.approvalStatus !== 'deleted' && s.status !== 'deleted');
+
+  useEffect(() => {
+    if (activeStaffList.length > 0 && !selectedDirectorStaffId) {
+      setSelectedDirectorStaffId(activeStaffList[0].userId);
+    }
+  }, [activeStaffList, selectedDirectorStaffId]);
 
   // Trigger stale auto-close in background on load
   useEffect(() => {
@@ -86,6 +107,9 @@ export const AttendancePage: React.FC = () => {
       return;
     }
 
+    const formattedCheckIn = `${inHour}:${inMinute} ${inPeriod}`;
+    const formattedCheckOut = `${outHour}:${outMinute} ${outPeriod}`;
+
     requirePinVerification('Authorize Manual Attendance Record Entry', async () => {
       setSubmittingManual(true);
       try {
@@ -94,8 +118,8 @@ export const AttendancePage: React.FC = () => {
           userName: targetStaff.fullName,
           userDesignation: targetStaff.designation,
           date: manualDate,
-          checkIn: checkInTime,
-          checkOut: checkOutTime,
+          checkIn: formattedCheckIn,
+          checkOut: formattedCheckOut,
           locationText: locationText.trim() || 'Head Office, Patna',
           manualReason: manualReason.trim(),
           createdById: userDoc?.uid || 'director',
@@ -125,11 +149,11 @@ export const AttendancePage: React.FC = () => {
             Attendance & Duty Logs
           </h1>
           <p className="text-xs text-gray-500 font-medium">
-            Realtime duty check-ins, check-outs, GPS location tracking, and working hours calculation.
+            Realtime duty check-ins, check-outs, GPS location tracking, and monthly calendar summary.
           </p>
         </div>
 
-        {canViewAll && (
+        {isDirector && (
           <Button
             variant="primary"
             icon={<PlusCircle className="w-4 h-4" />}
@@ -143,131 +167,176 @@ export const AttendancePage: React.FC = () => {
       {/* DUTY ON / OFF CARD */}
       <DutyCard />
 
-      {/* FILTERS */}
-      <Card className="p-4 flex flex-col sm:flex-row items-center gap-3">
-        <div className="flex-1 w-full">
-          <Input
-            placeholder="Search by staff name or designation..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            icon={<Calendar className="w-4 h-4 text-brand-600" />}
-          />
-        </div>
-      </Card>
+      {/* VIEW TABS */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+        <button
+          onClick={() => setActiveTab('calendar')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'calendar'
+              ? 'bg-brand-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          <CalendarDays className="w-4 h-4" />
+          {isDirector ? 'Monthly Calendar View' : 'My Monthly Attendance'}
+        </button>
 
-      {/* LOGS TABLE */}
-      {loading ? (
-        <p className="text-xs text-gray-400 animate-pulse text-center py-8">Loading attendance logs...</p>
-      ) : filteredLogs.length === 0 ? (
-        <Card className="p-8 text-center text-gray-500 text-xs italic">
-          No attendance logs recorded for selected date.
-        </Card>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase tracking-wider">
-                  <th className="py-3.5 px-4">Staff Member</th>
-                  <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Check-In</th>
-                  <th className="py-3.5 px-4">Check-Out</th>
-                  <th className="py-3.5 px-4">Duration</th>
-                  <th className="py-3.5 px-4">Status & Type</th>
-                  <th className="py-3.5 px-4 text-center">GPS Locations</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredLogs.map((log) => {
-                  const isAutoClosed = log.status === 'auto_closed' || log.isAutoClosed;
-                  const isManual = log.attendanceType === 'MANUAL';
+        {isDirector && (
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'logs'
+                ? 'bg-brand-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <ListFilter className="w-4 h-4" />
+            Daily Staff Logs Table
+          </button>
+        )}
+      </div>
 
-                  return (
-                    <tr key={log.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <p className="font-extrabold text-gray-900">{log.userName}</p>
-                        <p className="text-[10px] text-brand-600 font-bold uppercase">{log.userDesignation}</p>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-semibold text-gray-700">{log.date}</td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">{log.checkIn}</td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-gray-700">
-                        {log.checkOut || <span className="text-amber-600 text-[11px]">Active Shift</span>}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-gray-800">
-                        {log.totalMinutes > 0
-                          ? `${Math.floor(log.totalMinutes / 60)}h ${log.totalMinutes % 60}m`
-                          : '—'}
-                      </td>
-                      <td className="py-3.5 px-4 space-y-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {isAutoClosed ? (
-                            <Badge variant="warning" size="sm">
-                              AUTO CLOSED
-                            </Badge>
-                          ) : isManual ? (
-                            <Badge variant="brand" size="sm" className="bg-purple-100 text-purple-800 border-purple-200">
-                              MANUALLY ADDED
-                            </Badge>
-                          ) : (
-                            <Badge variant="success" size="sm">
-                              COMPLETED
-                            </Badge>
-                          )}
-                        </div>
-                        {isManual && log.manualReason && (
-                          <p className="text-[10px] text-purple-700 italic">Reason: {log.manualReason}</p>
-                        )}
-                        {isManual && log.createdByName && (
-                          <p className="text-[10px] text-gray-400">Added by: {log.createdByName}</p>
-                        )}
-                        {isAutoClosed && (
-                          <p className="text-[10px] text-amber-700 font-medium">Automatic Closed at 9:00 PM</p>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        {isAutoClosed ? (
-                          <span className="text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                            Automatic Closed
-                          </span>
-                        ) : (
-                          <div className="flex flex-col sm:flex-row gap-1 justify-center items-center">
-                            {log.checkInLocation && (log.checkInLocation.latitude !== 0 || log.checkInLocation.longitude !== 0) ? (
-                              <GoogleMapsButton
-                                latitude={log.checkInLocation.latitude}
-                                longitude={log.checkInLocation.longitude}
-                                label="Check-In Map"
-                              />
-                            ) : (
-                              <span className="text-[10px] text-gray-400">Manual Loc</span>
-                            )}
-                            {log.checkOutLocation && (log.checkOutLocation.latitude !== 0 || log.checkOutLocation.longitude !== 0) && (
-                              <GoogleMapsButton
-                                latitude={log.checkOutLocation.latitude}
-                                longitude={log.checkOutLocation.longitude}
-                                label="Check-Out Map"
-                              />
-                            )}
-                          </div>
-                        )}
-                      </td>
+      {/* TAB CONTENT 1: MONTHLY CALENDAR VIEW */}
+      {activeTab === 'calendar' && (
+        <StaffAttendanceCalendar
+          targetUserId={isDirector ? selectedDirectorStaffId : userDoc?.uid || ''}
+          targetUserName={isDirector ? activeStaffList.find((s) => s.userId === selectedDirectorStaffId)?.fullName : userDoc?.name}
+          canSelectStaff={isDirector}
+          staffList={activeStaffList}
+          onSelectStaffId={(id) => setSelectedDirectorStaffId(id)}
+        />
+      )}
+
+      {/* TAB CONTENT 2: DAILY LOGS TABLE (DIRECTOR VIEW) */}
+      {activeTab === 'logs' && isDirector && (
+        <div className="space-y-4">
+          {/* FILTERS */}
+          <Card className="p-4 flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex-1 w-full">
+              <Input
+                placeholder="Search by staff name or designation..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                icon={<Search className="w-4 h-4" />}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                icon={<CalendarIcon className="w-4 h-4 text-brand-600" />}
+              />
+            </div>
+          </Card>
+
+          {/* LOGS TABLE */}
+          {loading ? (
+            <p className="text-xs text-gray-400 animate-pulse text-center py-8">Loading attendance logs...</p>
+          ) : filteredLogs.length === 0 ? (
+            <Card className="p-8 text-center text-gray-500 text-xs italic">
+              No attendance logs recorded for selected date.
+            </Card>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase tracking-wider">
+                      <th className="py-3.5 px-4">Staff Member</th>
+                      <th className="py-3.5 px-4">Date</th>
+                      <th className="py-3.5 px-4">Check-In</th>
+                      <th className="py-3.5 px-4">Check-Out</th>
+                      <th className="py-3.5 px-4">Duration</th>
+                      <th className="py-3.5 px-4">Status & Type</th>
+                      <th className="py-3.5 px-4 text-center">GPS Locations</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredLogs.map((log) => {
+                      const isAutoClosed = log.status === 'auto_closed' || log.isAutoClosed;
+                      const isManual = log.attendanceType === 'MANUAL';
+
+                      return (
+                        <tr key={log.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <p className="font-extrabold text-gray-900">{log.userName}</p>
+                            <p className="text-[10px] text-brand-600 font-bold uppercase">{log.userDesignation}</p>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-semibold text-gray-700">{log.date}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">{log.checkIn}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-gray-700">
+                            {log.checkOut || <span className="text-amber-600 text-[11px]">Active Shift</span>}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-gray-800">
+                            {log.totalMinutes > 0
+                              ? `${Math.floor(log.totalMinutes / 60)}h ${log.totalMinutes % 60}m`
+                              : '—'}
+                          </td>
+                          <td className="py-3.5 px-4 space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isAutoClosed ? (
+                                <Badge variant="warning" size="sm">
+                                  AUTO CLOSED
+                                </Badge>
+                              ) : isManual ? (
+                                <Badge variant="brand" size="sm" className="bg-purple-100 text-purple-800 border-purple-200">
+                                  MANUALLY ADDED
+                                </Badge>
+                              ) : (
+                                <Badge variant="success" size="sm">
+                                  COMPLETED
+                                </Badge>
+                              )}
+                            </div>
+                            {isManual && log.manualReason && (
+                              <p className="text-[10px] text-purple-700 italic">Reason: {log.manualReason}</p>
+                            )}
+                            {isManual && log.createdByName && (
+                              <p className="text-[10px] text-gray-400">Added by: {log.createdByName}</p>
+                            )}
+                            {isAutoClosed && (
+                              <p className="text-[10px] text-amber-700 font-medium">Automatic Closed at 9:00 PM</p>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isAutoClosed ? (
+                              <span className="text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                                Automatic Closed
+                              </span>
+                            ) : (
+                              <div className="flex flex-col sm:flex-row gap-1 justify-center items-center">
+                                {log.checkInLocation && (log.checkInLocation.latitude !== 0 || log.checkInLocation.longitude !== 0) ? (
+                                  <GoogleMapsButton
+                                    latitude={log.checkInLocation.latitude}
+                                    longitude={log.checkInLocation.longitude}
+                                    label="Check-In Map"
+                                  />
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">Manual Loc</span>
+                                )}
+                                {log.checkOutLocation && (log.checkOutLocation.latitude !== 0 || log.checkOutLocation.longitude !== 0) && (
+                                  <GoogleMapsButton
+                                    latitude={log.checkOutLocation.latitude}
+                                    longitude={log.checkOutLocation.longitude}
+                                    label="Check-Out Map"
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* MANUAL ATTENDANCE MODAL FOR DIRECTOR */}
+      {/* MANUAL ATTENDANCE MODAL FOR DIRECTOR WITH TIME SELECTORS */}
       {manualModalOpen && (
         <Modal isOpen={manualModalOpen} onClose={() => setManualModalOpen(false)} title="Add Manual Attendance Record">
           <form onSubmit={handleCreateManualAttendance} className="space-y-4">
@@ -293,19 +362,87 @@ export const AttendancePage: React.FC = () => {
               required
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Duty On Time (e.g. 09:30 AM)"
-                value={checkInTime}
-                onChange={(e) => setCheckInTime(e.target.value)}
-                required
-              />
-              <Input
-                label="Duty Off Time (e.g. 06:00 PM)"
-                value={checkOutTime}
-                onChange={(e) => setCheckOutTime(e.target.value)}
-                required
-              />
+            {/* TIME SELECTORS (HOUR, MINUTE, AM/PM) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-3 rounded-2xl border border-gray-200">
+              {/* DUTY ON TIME SELECTOR */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+                  Duty On Time <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={inHour}
+                    onChange={(e) => setInHour(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-extrabold font-mono focus:outline-none focus:border-brand-500 shadow-sm"
+                  >
+                    {HOURS.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-extrabold text-gray-500">:</span>
+                  <select
+                    value={inMinute}
+                    onChange={(e) => setInMinute(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-extrabold font-mono focus:outline-none focus:border-brand-500 shadow-sm"
+                  >
+                    {MINUTES.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={inPeriod}
+                    onChange={(e) => setInPeriod(e.target.value as 'AM' | 'PM')}
+                    className="bg-brand-50 text-brand-700 border border-brand-200 rounded-xl px-2.5 py-1.5 text-xs font-black focus:outline-none focus:border-brand-500 shadow-sm"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* DUTY OFF TIME SELECTOR */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+                  Duty Off Time <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={outHour}
+                    onChange={(e) => setOutHour(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-extrabold font-mono focus:outline-none focus:border-brand-500 shadow-sm"
+                  >
+                    {HOURS.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-extrabold text-gray-500">:</span>
+                  <select
+                    value={outMinute}
+                    onChange={(e) => setOutMinute(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-extrabold font-mono focus:outline-none focus:border-brand-500 shadow-sm"
+                  >
+                    {MINUTES.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={outPeriod}
+                    onChange={(e) => setOutPeriod(e.target.value as 'AM' | 'PM')}
+                    className="bg-brand-50 text-brand-700 border border-brand-200 rounded-xl px-2.5 py-1.5 text-xs font-black focus:outline-none focus:border-brand-500 shadow-sm"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             <Input
