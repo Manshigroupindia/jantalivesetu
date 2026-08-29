@@ -5,7 +5,7 @@ import { Select } from '../../../components/ui/Select';
 import { Badge } from '../../../components/ui/Badge';
 import { Modal } from '../../../components/ui/Modal';
 import { GoogleMapsButton } from '../../../components/common/GoogleMapsButton';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, AlertCircle, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, AlertCircle, Sparkles, User } from 'lucide-react';
 import { useRealtimeCollection } from '../../../hooks/useRealtime';
 import { AttendanceRecord, CompanyHoliday, StaffProfile } from '../../../types';
 import { getCurrentDateISO, formatMonthYear } from '../../../utils/dateUtils';
@@ -38,6 +38,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
     isSunday: boolean;
     isHoliday: boolean;
     holidayTitle?: string;
+    isFuture: boolean;
   } | null>(null);
 
   // Fetch Attendance logs for target user
@@ -99,7 +100,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
   const holidayMap = new Map<string, string>();
   holidays.forEach((h) => {
     if (h.date && h.date.startsWith(selectedMonth)) {
-      holidayMap.set(h.date, h.title || 'Company Holiday');
+      holidayMap.set(h.date, h.holidayName || (h as any).title || 'Company Holiday');
     }
   });
 
@@ -158,20 +159,29 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
     <div className="space-y-6">
       {/* CONTROLS HEADER */}
       <Card className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* MONTH SELECTOR */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrevMonth} icon={<ChevronLeft className="w-4 h-4" />}>
-            Prev
-          </Button>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl">
-            <CalendarIcon className="w-4 h-4 text-brand-600" />
-            <span className="text-sm font-extrabold text-gray-900 font-mono">
-              {formatMonthYear(selectedMonth)}
-            </span>
+        {/* MONTH SELECTOR & STAFF NAME */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrevMonth} icon={<ChevronLeft className="w-4 h-4" />}>
+              Prev
+            </Button>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl">
+              <CalendarIcon className="w-4 h-4 text-brand-600" />
+              <span className="text-sm font-extrabold text-gray-900 font-mono">
+                {formatMonthYear(selectedMonth)}
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleNextMonth} icon={<ChevronRight className="w-4 h-4" />}>
+              Next
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={handleNextMonth} icon={<ChevronRight className="w-4 h-4" />}>
-            Next
-          </Button>
+
+          {targetUserName && (
+            <span className="text-xs font-bold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-brand-600" />
+              {targetUserName}
+            </span>
+          )}
         </div>
 
         {/* STAFF SELECTOR FOR DIRECTOR */}
@@ -353,7 +363,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
               {selectedDayDetail.status === 'sunday' && <Badge variant="warning" size="md">Sunday</Badge>}
               {selectedDayDetail.status === 'holiday' && <Badge variant="warning" size="md">Company Holiday</Badge>}
               {selectedDayDetail.status === 'absent' && <Badge variant="danger" size="md">Absent</Badge>}
-              {selectedDayDetail.status === 'future' && <Badge variant="secondary" size="md">Future Date</Badge>}
+              {selectedDayDetail.status === 'future' && <Badge variant="neutral" size="md">Future Date</Badge>}
             </div>
 
             {selectedDayDetail.attendance ? (
