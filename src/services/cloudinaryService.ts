@@ -73,3 +73,37 @@ export async function uploadToCloudinary(
     xhr.send(formData);
   });
 }
+
+export interface CloudinaryAudioUploadResult {
+  url: string;
+  secureUrl: string;
+  publicId: string;
+  resourceType: string;
+  format?: string;
+  duration?: number;
+}
+
+export async function uploadAudioToCloudinary(
+  file: File | Blob,
+  onProgress?: UploadProgressCallback
+): Promise<CloudinaryAudioUploadResult> {
+  const mimeType = file.type || 'audio/webm';
+  let ext = 'webm';
+  if (mimeType.includes('mp4') || mimeType.includes('m4a')) ext = 'mp4';
+  else if (mimeType.includes('mpeg') || mimeType.includes('mp3')) ext = 'mp3';
+  else if (mimeType.includes('ogg')) ext = 'ogg';
+  else if (mimeType.includes('wav')) ext = 'wav';
+
+  const audioFile = file instanceof File ? file : new File([file], `voice_${Date.now()}.${ext}`, { type: mimeType });
+
+  // Cloudinary requires resourceType = 'video' for audio files
+  const res = await uploadToCloudinary(audioFile, 'janta-live-setu/voice', 'video', onProgress);
+
+  return {
+    url: res.url,
+    secureUrl: res.secureUrl,
+    publicId: res.publicId,
+    resourceType: 'video',
+    format: ext,
+  };
+}

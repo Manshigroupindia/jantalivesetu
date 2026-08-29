@@ -866,6 +866,17 @@ export async function updateWorkAssignmentStatus(
 
 export const updateWorkStatus = updateWorkAssignmentStatus;
 
+export async function updateWorkAssignment(
+  workId: string,
+  updates: Partial<Omit<WorkAssignment, 'id'>>
+): Promise<void> {
+  const docRef = doc(db, 'workAssignments', workId);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 // Chat
 export async function sendChatMessage(
   arg1: string | Omit<ChatMessage, 'id'>,

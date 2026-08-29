@@ -138,6 +138,15 @@ export interface AttendanceRecord {
 export type WorkPriority = 'low' | 'medium' | 'high' | 'urgent' | 'normal';
 export type WorkStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'submitted';
 
+export interface WorkAudioAttachment {
+  url: string;
+  publicId?: string;
+  resourceType?: string;
+  format?: string;
+  duration?: number;
+  fileName?: string;
+}
+
 export interface WorkAssignment {
   id: string;
   title: string;
@@ -154,6 +163,7 @@ export interface WorkAssignment {
   priority: WorkPriority;
   textInstructions?: string;
   voiceNoteUrl?: string;
+  audioAttachment?: WorkAudioAttachment;
   imageUrl?: string;
   attachmentUrl?: string;
   status: WorkStatus;
