@@ -281,10 +281,24 @@ export const SalaryPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex justify-between p-2 rounded-lg bg-gray-50">
-                <span className="font-medium text-gray-700">Paid Sundays (Max 4):</span>
-                <span className="font-bold text-emerald-600">+{breakdown.sundaysCount} days</span>
+              <div className="flex justify-between p-2 rounded-lg bg-yellow-50 text-yellow-950 border border-yellow-200">
+                <span className="font-bold text-yellow-900">Paid Sundays Base Pay (Max 4):</span>
+                <span className="font-extrabold text-yellow-800">+{breakdown.sundaysCount} days ({formatINR(breakdown.sundayBasePay ?? Math.round((breakdown.sundaysCount || 0) * breakdown.dailyRate))})</span>
               </div>
+
+              {Boolean(breakdown.sundayWorkPay && breakdown.sundayWorkPay > 0) && (
+                <div className="flex justify-between p-2 rounded-lg bg-emerald-100 text-emerald-950 border border-emerald-300 font-bold">
+                  <span className="font-extrabold text-emerald-900">★ Extra Sunday Work Bonus:</span>
+                  <span className="font-black text-emerald-800">+{formatINR(breakdown.sundayWorkPay)} ({breakdown.workedSundaysCount} Sunday worked)</span>
+                </div>
+              )}
+
+              {Boolean(breakdown.sundayLeaveCoverCount && breakdown.sundayLeaveCoverCount > 0) && (
+                <div className="flex justify-between p-2 rounded-lg bg-purple-50 text-purple-950 border border-purple-200 font-bold">
+                  <span className="font-extrabold text-purple-900">★ Sunday Leave Cover:</span>
+                  <span className="font-black text-purple-800">+{breakdown.sundayLeaveCoverCount} leave date(s) covered (0 deduction)</span>
+                </div>
+              )}
 
               {Boolean(breakdown.fifthSundayCount && breakdown.fifthSundayCount > 0) && (
                 <div className="flex justify-between p-2 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 font-semibold">

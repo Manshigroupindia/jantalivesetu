@@ -106,8 +106,17 @@ export interface AttendanceRecord {
   checkInLocation: LocationRecord;
   checkOutLocation?: LocationRecord;
   totalMinutes: number;
-  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'completed' | 'auto_closed' | 'paid_leave';
+  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'completed' | 'auto_closed' | 'paid_leave' | 'sunday' | 'covered_leave';
   attendanceType?: 'REGULAR' | 'MANUAL' | 'AUTO';
+  workType?: 'NORMAL' | 'SUNDAY_WORK' | 'LEAVE_COVER';
+  isSunday?: boolean;
+  isSundayWorked?: boolean;
+  isLeaveCover?: boolean;
+  coveredLeaveDate?: string | null;
+  coveredBySundayDate?: string | null;
+  sundayBasePay?: number;
+  sundayWorkPay?: number;
+  leaveCoverValue?: number;
   isAutoClosed?: boolean;
   checkoutType?: 'REGULAR' | 'AUTO';
   manualReason?: string;
@@ -346,6 +355,12 @@ export interface SalaryCalculationResult {
   isFifthSundayNeutral?: boolean;
   has31stNeutralDay?: boolean;
   neutralDaysCount?: number;
+
+  workedSundaysCount?: number;
+  sundayBasePay?: number;
+  sundayWorkPay?: number;
+  sundayLeaveCoverCount?: number;
+  sundayLeaveCoverValue?: number;
 
   // Aliases
   baseSalary?: number;

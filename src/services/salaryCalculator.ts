@@ -16,9 +16,21 @@ export interface SalaryInputData {
  * Resolves attendance status and payable day fraction (1.0 for Full Day, 0.5 for Half Day, 0 for Absent).
  * Applies the 2:00 PM cutoff rule to both NEW and EXISTING attendance records!
  */
-export function getAttendanceStatusAndFraction(att?: AttendanceRecord): { status: 'PRESENT' | 'HALF_DAY' | 'ABSENT'; fraction: number } {
+export function getAttendanceStatusAndFraction(att?: AttendanceRecord): { status: 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'SUNDAY' | 'COVERED_LEAVE'; fraction: number } {
   if (!att) {
     return { status: 'ABSENT', fraction: 0 };
+  }
+
+  if (att.status === 'covered_leave' || Boolean(att.coveredBySundayDate)) {
+    return { status: 'COVERED_LEAVE', fraction: 1 };
+  }
+
+  if (att.status === 'sunday') {
+    if (att.workType === 'SUNDAY_WORK' || (att.checkIn && att.workType !== 'LEAVE_COVER')) {
+      const isHalf = att.checkIn ? isHalfDayCheckIn(att.checkIn) : false;
+      return { status: isHalf ? 'HALF_DAY' : 'PRESENT', fraction: isHalf ? 0.5 : 1 };
+    }
+    return { status: 'SUNDAY', fraction: 0 };
   }
 
   if (att.status === 'absent') {
@@ -132,6 +144,17 @@ export function calculateSalaryBreakdown(
     });
   }
 
+  // Identify all covered leave dates
+  const coveredLeaveSet = new Set<string>();
+  attendanceMap.forEach((att) => {
+    if (att.status === 'covered_leave' || att.coveredBySundayDate) {
+      coveredLeaveSet.add(att.date);
+    }
+    if (att.coveredLeaveDate) {
+      coveredLeaveSet.add(att.coveredLeaveDate);
+    }
+  });
+
   // Create holiday lookup by date (avoid double counting with Sundays)
   const holidaySet = new Set<string>();
   if (Array.isArray(holidays)) {
@@ -148,11 +171,16 @@ export function calculateSalaryBreakdown(
   let halfDaysCount = 0;
   let workedDaysUnits = 0;
   let paidSundays = 0;
+  let workedSundaysCount = 0;
+  let sundayBasePayTotal = 0;
+  let sundayWorkPayTotal = 0;
+  let sundayLeaveCoverCount = 0;
   let paidHolidays = 0;
   let emergencyLeavesUsed = 0;
   let unpaidLeaves = 0;
   let neutralDaysCount = 0;
   let has31stNeutralDay = false;
+  let coveredLeavesUnits = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -161,12 +189,6 @@ export function calculateSalaryBreakdown(
     const isCompanyHoliday = holidaySet.has(dateStr);
     const attendance = attendanceMap.get(dateStr);
 
-    // Rule for 5th Sunday: Neutral (0 pay addition, 0 deduction)
-    if (isFifthSunday) {
-      neutralDaysCount++;
-      continue;
-    }
-
     // Rule for 31st Calendar Day: Neutral (0 pay addition, 0 deduction)
     if (day === 31) {
       has31stNeutralDay = true;
@@ -174,7 +196,44 @@ export function calculateSalaryBreakdown(
       continue;
     }
 
-    const { fraction } = getAttendanceStatusAndFraction(attendance);
+    // Process Sunday
+    if (dateStr && (new Date(year, monthIdx, day).getDay() === 0)) {
+      if (isPaidSunday) {
+        paidSundays++;
+        sundayBasePayTotal += dailyRate;
+      } else if (isFifthSunday) {
+        neutralDaysCount++;
+      }
+
+      if (attendance) {
+        const isWorkedSunday =
+          attendance.workType === 'SUNDAY_WORK' ||
+          attendance.workType === 'LEAVE_COVER' ||
+          attendance.isSundayWorked === true ||
+          Boolean(attendance.checkIn);
+
+        if (isWorkedSunday) {
+          workedSundaysCount++;
+          if (attendance.workType === 'LEAVE_COVER' || attendance.isLeaveCover) {
+            sundayLeaveCoverCount++;
+          } else {
+            // Sunday Work Pay: Full day = 1.0x dailyRate, Half day = 0.5x dailyRate
+            const isHalf = attendance.checkIn ? isHalfDayCheckIn(attendance.checkIn) : (attendance.payableFraction === 0.5);
+            const multiplier = isHalf ? 0.5 : 1.0;
+            sundayWorkPayTotal += Math.round(multiplier * dailyRate);
+          }
+        }
+      }
+      continue;
+    }
+
+    // Process Non-Sunday dates
+    if (coveredLeaveSet.has(dateStr) || attendance?.status === 'covered_leave' || attendance?.coveredBySundayDate) {
+      coveredLeavesUnits += 1;
+      continue;
+    }
+
+    const { status: attStatus, fraction } = getAttendanceStatusAndFraction(attendance);
 
     if (fraction === 1) {
       fullDaysCount++;
@@ -188,8 +247,6 @@ export function calculateSalaryBreakdown(
       } else {
         unpaidLeaves++;
       }
-    } else if (isPaidSunday) {
-      paidSundays++;
     } else if (isCompanyHoliday) {
       paidHolidays++;
     } else {
@@ -205,7 +262,7 @@ export function calculateSalaryBreakdown(
   }
 
   // Total paid days before cap
-  const totalPaidDaysUnits = workedDaysUnits + paidSundays + paidHolidays + emergencyLeavesUsed;
+  const totalPaidDaysUnits = workedDaysUnits + paidSundays + paidHolidays + emergencyLeavesUsed + coveredLeavesUnits;
 
   // Cap total paid units at 30 days for 30-day salary basis
   const cappedPaidUnits = Math.min(30, totalPaidDaysUnits);
@@ -223,7 +280,8 @@ export function calculateSalaryBreakdown(
     earnedSalary = Math.max(0, monthlySalary - salaryDeductionAmount);
   }
 
-  const grossSalary = earnedSalary;
+  // Gross Salary includes Base Earned Salary PLUS Sunday Work Bonus Pay!
+  const grossSalary = earnedSalary + sundayWorkPayTotal;
   const netSalaryBeforeExpenses = Math.max(0, grossSalary - advanceDeduction);
   const finalTotalPayable = netSalaryBeforeExpenses + approvedExpensesTotal;
 
@@ -251,6 +309,12 @@ export function calculateSalaryBreakdown(
     isFifthSundayNeutral,
     has31stNeutralDay,
     neutralDaysCount,
+
+    workedSundaysCount,
+    sundayBasePay: Math.round(sundayBasePayTotal),
+    sundayWorkPay: Math.round(sundayWorkPayTotal),
+    sundayLeaveCoverCount,
+    sundayLeaveCoverValue: Math.round(coveredLeavesUnits * dailyRate),
 
     // Detailed breakdown & aliases for UI Components & SalaryPage
     baseSalary: monthlySalary,

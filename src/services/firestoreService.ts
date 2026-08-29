@@ -470,7 +470,9 @@ export async function createManualAttendance(data: {
   manualReason: string;
   createdById: string;
   createdByName: string;
-  status?: 'present' | 'absent' | 'half_day';
+  status?: 'present' | 'absent' | 'half_day' | 'sunday' | 'covered_leave';
+  workType?: 'NORMAL' | 'SUNDAY_WORK' | 'LEAVE_COVER';
+  coveredLeaveDate?: string | null;
   replaceExistingIfDuplicate?: boolean;
 }): Promise<string> {
   // Check duplicate attendance for date
@@ -491,7 +493,7 @@ export async function createManualAttendance(data: {
   }
 
   let totalMinutes = 480;
-  if (data.status === 'absent') {
+  if (data.status === 'absent' || (data.status === 'sunday' && (!data.checkIn || data.workType === 'NORMAL'))) {
     totalMinutes = 0;
   } else if (data.checkIn && data.checkOut) {
     try {
@@ -510,10 +512,16 @@ export async function createManualAttendance(data: {
     capturedAt: new Date().toISOString(),
   };
 
-  let finalStatus: 'present' | 'half_day' | 'absent' = data.status || 'present';
+  let finalStatus: 'present' | 'half_day' | 'absent' | 'sunday' | 'covered_leave' = data.status || 'present';
   let payableFraction = 1;
 
-  if (data.status === 'absent') {
+  if (data.status === 'sunday') {
+    finalStatus = 'sunday';
+    payableFraction = (data.checkIn && isHalfDayCheckIn(data.checkIn)) ? 0.5 : (data.checkIn ? 1 : 0);
+  } else if (data.status === 'covered_leave') {
+    finalStatus = 'covered_leave';
+    payableFraction = 1;
+  } else if (data.status === 'absent') {
     finalStatus = 'absent';
     payableFraction = 0;
   } else if (data.status === 'half_day' || (data.checkIn && isHalfDayCheckIn(data.checkIn))) {
@@ -529,13 +537,18 @@ export async function createManualAttendance(data: {
     userName: data.userName,
     userDesignation: data.userDesignation,
     date: data.date,
-    checkIn: finalStatus === 'absent' ? '' : data.checkIn,
-    checkOut: finalStatus === 'absent' ? '' : data.checkOut,
+    checkIn: (data.status === 'absent' || (data.status === 'sunday' && data.workType === 'NORMAL')) ? '' : data.checkIn,
+    checkOut: (data.status === 'absent' || (data.status === 'sunday' && data.workType === 'NORMAL')) ? '' : data.checkOut,
     checkInLocation: locationObj,
     checkOutLocation: locationObj,
     totalMinutes,
     status: finalStatus as any,
     payableFraction,
+    workType: data.workType || 'NORMAL',
+    isSunday: data.status === 'sunday' || new Date(data.date).getDay() === 0,
+    isSundayWorked: data.status === 'sunday' && Boolean(data.checkIn),
+    isLeaveCover: data.workType === 'LEAVE_COVER',
+    coveredLeaveDate: data.coveredLeaveDate || null,
     attendanceType: 'MANUAL',
     isManuallyEdited: true,
     manualReason: data.manualReason,
@@ -556,7 +569,9 @@ export async function updateManualAttendance(
     userName?: string;
     userDesignation?: string;
     date: string;
-    status: 'present' | 'absent' | 'half_day';
+    status: 'present' | 'absent' | 'half_day' | 'sunday' | 'covered_leave';
+    workType?: 'NORMAL' | 'SUNDAY_WORK' | 'LEAVE_COVER';
+    coveredLeaveDate?: string | null;
     checkIn?: string;
     checkOut?: string;
     locationText?: string;
@@ -599,7 +614,7 @@ export async function updateManualAttendance(
   }
 
   let totalMinutes = existingData.totalMinutes || 480;
-  if (data.status === 'absent') {
+  if (data.status === 'absent' || data.status === 'sunday' && (!data.checkIn || data.workType === 'NORMAL')) {
     totalMinutes = 0;
   } else if (data.checkIn && data.checkOut) {
     try {
@@ -611,10 +626,16 @@ export async function updateManualAttendance(
     }
   }
 
-  let finalStatus: 'present' | 'half_day' | 'absent' = data.status;
+  let finalStatus: 'present' | 'half_day' | 'absent' | 'sunday' | 'covered_leave' = data.status;
   let payableFraction = 1;
 
-  if (data.status === 'absent') {
+  if (data.status === 'sunday') {
+    finalStatus = 'sunday';
+    payableFraction = (data.checkIn && isHalfDayCheckIn(data.checkIn)) ? 0.5 : (data.checkIn ? 1 : 0);
+  } else if (data.status === 'covered_leave') {
+    finalStatus = 'covered_leave';
+    payableFraction = 1;
+  } else if (data.status === 'absent') {
     finalStatus = 'absent';
     payableFraction = 0;
   } else if (data.status === 'half_day' || (data.checkIn && isHalfDayCheckIn(data.checkIn))) {
@@ -629,8 +650,13 @@ export async function updateManualAttendance(
     date: data.date,
     status: finalStatus as any,
     payableFraction,
-    checkIn: data.status === 'absent' ? '' : data.checkIn || existingData.checkIn || '09:00 AM',
-    checkOut: data.status === 'absent' ? '' : data.checkOut || existingData.checkOut || '06:00 PM',
+    workType: data.workType || existingData.workType || 'NORMAL',
+    isSunday: data.status === 'sunday' || new Date(data.date).getDay() === 0,
+    isSundayWorked: data.status === 'sunday' && Boolean(data.checkIn),
+    isLeaveCover: data.workType === 'LEAVE_COVER',
+    coveredLeaveDate: data.coveredLeaveDate !== undefined ? data.coveredLeaveDate : existingData.coveredLeaveDate,
+    checkIn: (data.status === 'absent' || (data.status === 'sunday' && data.workType === 'NORMAL')) ? '' : (data.checkIn || existingData.checkIn || ''),
+    checkOut: (data.status === 'absent' || (data.status === 'sunday' && data.workType === 'NORMAL')) ? '' : (data.checkOut || existingData.checkOut || ''),
     totalMinutes,
     attendanceType: existingData.attendanceType || 'REGULAR',
     isManuallyEdited: true,
@@ -645,13 +671,135 @@ export async function updateManualAttendance(
     updatedAt: new Date().toISOString(),
   };
 
-  if (data.status === 'absent') {
+  if (data.status === 'absent' || (data.status === 'sunday' && data.workType === 'NORMAL')) {
     const emptyLoc: LocationRecord = { latitude: 0, longitude: 0, accuracy: 0, capturedAt: new Date().toISOString() };
     updateFields.checkInLocation = emptyLoc;
     updateFields.checkOutLocation = emptyLoc;
   }
 
   await updateDoc(currentDocRef, updateFields);
+
+  // If workType is LEAVE_COVER and coveredLeaveDate is provided, update the target leave record
+  if (data.workType === 'LEAVE_COVER' && data.coveredLeaveDate) {
+    const targetDate = data.coveredLeaveDate;
+    const leaveQ = query(
+      collection(db, 'attendance'),
+      where('userId', '==', data.userId),
+      where('date', '==', targetDate)
+    );
+    const leaveSnap = await getDocs(leaveQ);
+    if (!leaveSnap.empty) {
+      await updateDoc(leaveSnap.docs[0].ref, {
+        status: 'covered_leave',
+        coveredBySundayDate: data.date,
+        payableFraction: 1,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      await addDoc(collection(db, 'attendance'), {
+        userId: data.userId,
+        userName: data.userName || existingData.userName || 'Staff Member',
+        userDesignation: data.userDesignation || existingData.userDesignation || 'Staff',
+        date: targetDate,
+        status: 'covered_leave',
+        coveredBySundayDate: data.date,
+        payableFraction: 1,
+        checkIn: '',
+        checkOut: '',
+        checkInLocation: { latitude: 0, longitude: 0, accuracy: 0, capturedAt: new Date().toISOString() },
+        totalMinutes: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+}
+
+export async function recordSundayLeaveCover(params: {
+  userId: string;
+  userName: string;
+  userDesignation: string;
+  sundayDate: string;
+  checkIn: string;
+  checkInLocation: LocationRecord;
+  coveredLeaveDate: string;
+}): Promise<void> {
+  const { userId, userName, userDesignation, sundayDate, checkIn, checkInLocation, coveredLeaveDate } = params;
+
+  // 1. Check if coveredLeaveDate was already covered
+  const checkCoveredQ = query(
+    collection(db, 'attendance'),
+    where('userId', '==', userId),
+    where('date', '==', coveredLeaveDate)
+  );
+  const checkCoveredSnap = await getDocs(checkCoveredQ);
+  if (!checkCoveredSnap.empty) {
+    const existingRec = checkCoveredSnap.docs[0].data() as AttendanceRecord;
+    if (existingRec.coveredBySundayDate && existingRec.coveredBySundayDate !== sundayDate) {
+      throw new Error(`This leave (${coveredLeaveDate}) has already been covered on ${existingRec.coveredBySundayDate}.`);
+    }
+  }
+
+  // 2. Create or update Sunday attendance record
+  const sundayQ = query(
+    collection(db, 'attendance'),
+    where('userId', '==', userId),
+    where('date', '==', sundayDate)
+  );
+  const sundaySnap = await getDocs(sundayQ);
+
+  const sundayRecordData: Partial<AttendanceRecord> = {
+    userId,
+    userName,
+    userDesignation,
+    date: sundayDate,
+    checkIn,
+    checkInLocation,
+    totalMinutes: 0,
+    status: 'sunday',
+    workType: 'LEAVE_COVER',
+    isSunday: true,
+    isSundayWorked: true,
+    isLeaveCover: true,
+    coveredLeaveDate,
+    payableFraction: 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (!sundaySnap.empty) {
+    await updateDoc(sundaySnap.docs[0].ref, sundayRecordData);
+  } else {
+    await addDoc(collection(db, 'attendance'), {
+      ...sundayRecordData,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  // 3. Mark covered Leave date attendance
+  if (!checkCoveredSnap.empty) {
+    await updateDoc(checkCoveredSnap.docs[0].ref, {
+      status: 'covered_leave',
+      coveredBySundayDate: sundayDate,
+      payableFraction: 1,
+      updatedAt: new Date().toISOString(),
+    });
+  } else {
+    await addDoc(collection(db, 'attendance'), {
+      userId,
+      userName,
+      userDesignation,
+      date: coveredLeaveDate,
+      status: 'covered_leave',
+      coveredBySundayDate: sundayDate,
+      payableFraction: 1,
+      checkIn: '',
+      checkOut: '',
+      checkInLocation,
+      totalMinutes: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
 }
 
 export async function autoCloseStaleAttendance(records: AttendanceRecord[]): Promise<void> {

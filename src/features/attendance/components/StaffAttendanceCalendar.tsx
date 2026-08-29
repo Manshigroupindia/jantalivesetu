@@ -295,7 +295,11 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
               let badgeColor = 'bg-gray-200 text-gray-700';
               let statusLabel = 'Future';
 
-              if (status === 'present') {
+              if (status === 'covered_leave' || attendance?.status === 'covered_leave' || attendance?.coveredBySundayDate) {
+                bgClasses = 'bg-teal-50/90 hover:bg-teal-100 border-teal-300 text-teal-950';
+                badgeColor = 'bg-teal-600 text-white';
+                statusLabel = 'Covered Leave';
+              } else if (status === 'present') {
                 bgClasses = 'bg-emerald-50/90 hover:bg-emerald-100 border-emerald-300 text-emerald-950';
                 badgeColor = 'bg-emerald-600 text-white';
                 statusLabel = 'Present';
@@ -303,10 +307,22 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                 bgClasses = 'bg-amber-100/90 hover:bg-amber-200/90 border-amber-400 text-amber-950';
                 badgeColor = 'bg-amber-600 text-white';
                 statusLabel = 'Half Day';
-              } else if (status === 'sunday' || status === 'holiday') {
+              } else if (status === 'sunday' || isSunday) {
+                bgClasses = 'bg-yellow-50/80 hover:bg-yellow-100/80 border-yellow-300 text-yellow-950';
+                if (attendance?.workType === 'SUNDAY_WORK' || attendance?.isSundayWorked) {
+                  badgeColor = 'bg-emerald-700 text-white';
+                  statusLabel = 'Sunday (Worked)';
+                } else if (attendance?.workType === 'LEAVE_COVER' || attendance?.isLeaveCover) {
+                  badgeColor = 'bg-purple-700 text-white';
+                  statusLabel = 'Sunday (Cover)';
+                } else {
+                  badgeColor = 'bg-yellow-600 text-white';
+                  statusLabel = 'Sunday';
+                }
+              } else if (status === 'holiday') {
                 bgClasses = 'bg-yellow-50/80 hover:bg-yellow-100/80 border-yellow-300 text-yellow-950';
                 badgeColor = 'bg-yellow-600 text-white';
-                statusLabel = isHoliday ? 'Holiday' : 'Sunday';
+                statusLabel = 'Holiday';
               } else if (status === 'absent') {
                 bgClasses = 'bg-red-50/80 hover:bg-red-100/80 border-red-300 text-red-950';
                 badgeColor = 'bg-red-600 text-white';
@@ -334,14 +350,20 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                         </span>
                       )}
                     </span>
-                    <span className={`text-[9px] sm:text-[10px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-tight ${badgeColor}`}>
+                    <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-tight ${badgeColor}`}>
                       {statusLabel}
                     </span>
                   </div>
 
                   <div className="truncate text-[10px] font-semibold">
                     {attendance ? (
-                      status === 'absent' ? (
+                      attendance.status === 'covered_leave' || attendance.coveredBySundayDate ? (
+                        <span className="text-teal-800 block font-bold truncate">Covered by {attendance.coveredBySundayDate || 'Sunday'}</span>
+                      ) : attendance.workType === 'LEAVE_COVER' ? (
+                        <span className="text-purple-800 block font-bold truncate">Covers {attendance.coveredLeaveDate || 'Leave'}</span>
+                      ) : attendance.workType === 'SUNDAY_WORK' ? (
+                        <span className="text-emerald-800 block font-bold truncate">Worked: {attendance.checkIn}</span>
+                      ) : status === 'absent' ? (
                         <span className="text-red-700 block font-bold">Absent</span>
                       ) : (
                         <span className="font-mono text-emerald-900 block truncate font-bold">
@@ -368,11 +390,11 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
         <div className="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-gray-600">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm" />
-            <span>🟢 Present (Full Day)</span>
+            <span>🟢 Present</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm" />
-            <span>🟧 Half Day (After 2:00 PM)</span>
+            <span>🟧 Half Day</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-red-500 shadow-sm" />
@@ -380,15 +402,19 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm" />
-            <span>🟡 Sunday / Company Holiday</span>
+            <span>🟡 Sunday / Holiday</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-purple-500 shadow-sm" />
+            <span>🟣 Sunday Leave Cover</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-teal-500 shadow-sm" />
+            <span>🟢 Covered Leave (0 Deduct)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="px-1 py-0.2 bg-purple-100 text-purple-700 rounded text-[10px] font-black">✎</span>
-            <span>Manual / Edited Entry</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-gray-300 shadow-sm" />
-            <span>⚪ Future Date</span>
+            <span>Manual / Edited</span>
           </div>
         </div>
       </Card>

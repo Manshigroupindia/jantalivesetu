@@ -48,7 +48,9 @@ export const AttendancePage: React.FC = () => {
 
   // Edit & Duplicate Conflict state
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
-  const [attendanceStatus, setAttendanceStatus] = useState<'present' | 'half_day' | 'absent'>('present');
+  const [attendanceStatus, setAttendanceStatus] = useState<'present' | 'half_day' | 'absent' | 'sunday' | 'covered_leave'>('present');
+  const [workType, setWorkType] = useState<'NORMAL' | 'SUNDAY_WORK' | 'LEAVE_COVER'>('NORMAL');
+  const [coveredLeaveDate, setCoveredLeaveDate] = useState<string>('');
   const [duplicateConflictOpen, setDuplicateConflictOpen] = useState(false);
 
   // Calendar Director Staff Filter
@@ -111,6 +113,8 @@ export const AttendancePage: React.FC = () => {
     setSelectedStaffId(activeStaffList[0]?.userId || '');
     setManualDate(getCurrentDateISO());
     setAttendanceStatus('present');
+    setWorkType('NORMAL');
+    setCoveredLeaveDate('');
     setInHour('09');
     setInMinute('30');
     setInPeriod('AM');
@@ -129,7 +133,10 @@ export const AttendancePage: React.FC = () => {
       setEditingRecord(null);
       setSelectedStaffId(selectedDirectorStaffId || activeStaffList[0]?.userId || '');
       setManualDate(dateStr || getCurrentDateISO());
-      setAttendanceStatus('present');
+      const isSun = dateStr ? new Date(dateStr).getDay() === 0 : false;
+      setAttendanceStatus(isSun ? 'sunday' : 'present');
+      setWorkType('NORMAL');
+      setCoveredLeaveDate('');
       setInHour('09');
       setInMinute('30');
       setInPeriod('AM');
@@ -147,8 +154,12 @@ export const AttendancePage: React.FC = () => {
     setSelectedStaffId(log.userId);
     setManualDate(log.date);
     
-    let initialStatus: 'present' | 'half_day' | 'absent' = 'present';
-    if (log.status === 'absent') {
+    let initialStatus: 'present' | 'half_day' | 'absent' | 'sunday' | 'covered_leave' = 'present';
+    if (log.status === 'sunday') {
+      initialStatus = 'sunday';
+    } else if (log.status === 'covered_leave') {
+      initialStatus = 'covered_leave';
+    } else if (log.status === 'absent') {
       initialStatus = 'absent';
     } else if (log.status === 'half_day' || log.payableFraction === 0.5 || isHalfDayCheckIn(log.checkIn)) {
       initialStatus = 'half_day';
@@ -156,6 +167,8 @@ export const AttendancePage: React.FC = () => {
       initialStatus = 'present';
     }
     setAttendanceStatus(initialStatus);
+    setWorkType(log.workType || 'NORMAL');
+    setCoveredLeaveDate(log.coveredLeaveDate || '');
 
     const inT = parseTimeString(log.checkIn);
     setInHour(inT.hour);
@@ -204,6 +217,8 @@ export const AttendancePage: React.FC = () => {
             userDesignation: targetStaff.designation,
             date: manualDate,
             status: attendanceStatus,
+            workType: attendanceStatus === 'sunday' ? workType : 'NORMAL',
+            coveredLeaveDate: (attendanceStatus === 'sunday' && workType === 'LEAVE_COVER') ? coveredLeaveDate : null,
             checkIn: formattedCheckIn,
             checkOut: formattedCheckOut,
             locationText: locationText.trim() || 'Head Office, Patna',
@@ -226,6 +241,8 @@ export const AttendancePage: React.FC = () => {
             createdById: userDoc?.uid || 'director',
             createdByName: currentUserProfile?.fullName || userDoc?.name || 'Director',
             status: attendanceStatus,
+            workType: attendanceStatus === 'sunday' ? workType : 'NORMAL',
+            coveredLeaveDate: (attendanceStatus === 'sunday' && workType === 'LEAVE_COVER') ? coveredLeaveDate : null,
             replaceExistingIfDuplicate: replaceExisting,
           });
           showToast('Manual attendance record added successfully.', 'success');
@@ -544,17 +561,46 @@ export const AttendancePage: React.FC = () => {
               <Select
                 label="Attendance Status"
                 value={attendanceStatus}
-                onChange={(e) => setAttendanceStatus(e.target.value as 'present' | 'half_day' | 'absent')}
+                onChange={(e) => setAttendanceStatus(e.target.value as any)}
                 options={[
                   { value: 'present', label: 'Present (Full Day)' },
                   { value: 'half_day', label: 'Half Day (50% Pay)' },
                   { value: 'absent', label: 'Absent (0 Pay / Deduction)' },
+                  { value: 'sunday', label: 'Sunday (Rest / Work / Leave Cover)' },
+                  { value: 'covered_leave', label: 'Covered Leave (0 Deduction)' },
                 ]}
               />
             </div>
 
+            {/* SUNDAY WORK TYPE & LEAVE COVER CONTROLS */}
+            {attendanceStatus === 'sunday' && (
+              <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200 space-y-3">
+                <Select
+                  label="Sunday Work Type"
+                  value={workType}
+                  onChange={(e) => setWorkType(e.target.value as any)}
+                  options={[
+                    { value: 'NORMAL', label: 'Normal Sunday (Rest Day — 0 Duty Hours)' },
+                    { value: 'SUNDAY_WORK', label: 'Sunday Work (Earn Extra Sunday Bonus)' },
+                    { value: 'LEAVE_COVER', label: 'Leave Cover (Cover Previous Unpaid Leave)' },
+                  ]}
+                />
+
+                {workType === 'LEAVE_COVER' && (
+                  <Input
+                    label="Target Covered Leave Date (YYYY-MM-DD)"
+                    type="date"
+                    value={coveredLeaveDate}
+                    onChange={(e) => setCoveredLeaveDate(e.target.value)}
+                    required
+                    placeholder="e.g. 2026-08-10"
+                  />
+                )}
+              </div>
+            )}
+
             {/* REALTIME 2:00 PM HALF DAY WARNING */}
-            {attendanceStatus !== 'absent' && isHalfDayCheckIn(`${inHour}:${inMinute} ${inPeriod}`) && (
+            {attendanceStatus !== 'absent' && attendanceStatus !== 'sunday' && isHalfDayCheckIn(`${inHour}:${inMinute} ${inPeriod}`) && (
               <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl flex items-start gap-2 text-amber-900 text-xs">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
