@@ -1,8 +1,11 @@
-const CACHE_NAME = 'janta-live-setu-v1';
+const CACHE_NAME = 'janta-live-setu-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/logo.svg',
+  '/pwa-192.png',
+  '/pwa-512.png',
+  '/pwa-maskable-512.png',
   '/manifest.webmanifest'
 ];
 
