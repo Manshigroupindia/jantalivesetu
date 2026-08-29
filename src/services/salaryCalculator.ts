@@ -174,7 +174,7 @@ export function calculateSalaryBreakdown(
       continue;
     }
 
-    const { status: attStatus, fraction } = getAttendanceStatusAndFraction(attendance);
+    const { fraction } = getAttendanceStatusAndFraction(attendance);
 
     if (fraction === 1) {
       fullDaysCount++;

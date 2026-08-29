@@ -34,6 +34,7 @@ import {
   ClientRecord
 } from '../types';
 import { getNextUniqueStaffId } from '../utils/idGenerator';
+import { parseTimeToMinutes, isHalfDayCheckIn } from '../utils/dateUtils';
 
 export function subscribeToCollection<T>(
   collectionName: string,

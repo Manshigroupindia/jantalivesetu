@@ -35,7 +35,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
     dateStr: string;
     dayNum: number;
     dayName: string;
-    status: 'present' | 'absent' | 'sunday' | 'holiday' | 'manual' | 'future';
+    status: 'present' | 'absent' | 'half_day' | 'sunday' | 'holiday' | 'manual' | 'future';
     attendance?: AttendanceRecord;
     isSunday: boolean;
     isFifthSunday?: boolean;

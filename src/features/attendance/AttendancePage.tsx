@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { DutyCard } from '../dashboard/components/DutyCard';
 import { GoogleMapsButton } from '../../components/common/GoogleMapsButton';
 import { StaffAttendanceCalendar } from './components/StaffAttendanceCalendar';
-import { Clock, Calendar as CalendarIcon, Search, PlusCircle, ListFilter, CalendarDays, Edit3, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, Search, PlusCircle, ListFilter, CalendarDays, Edit3, AlertTriangle } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AttendanceRecord } from '../../types';
 import { getCurrentDateISO, isHalfDayCheckIn } from '../../utils/dateUtils';
