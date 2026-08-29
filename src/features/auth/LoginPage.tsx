@@ -5,10 +5,12 @@ import { Button } from '../../components/ui/Button';
 import { Lock, Mail, ShieldCheck, UserCheck, KeyRound, AlertCircle, ArrowLeft } from 'lucide-react';
 import { loginWithCredentials, sendDirectorPasswordReset, DIRECTOR_FIXED_EMAIL } from '../../services/authService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCompany } from '../../contexts/CompanyContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { refreshUserDoc } = useAuth();
+  const { companySettings } = useCompany();
   
   const [selectedRole, setSelectedRole] = useState<'director' | 'staff' | null>(null);
   const [email, setEmail] = useState('');
@@ -108,11 +110,21 @@ export const LoginPage: React.FC = () => {
 
           <div className="space-y-4 z-10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white text-brand-600 font-black text-xl flex items-center justify-center shadow-lg">
-                JL
-              </div>
+              {companySettings?.logoUrl ? (
+                <img
+                  src={companySettings.logoUrl}
+                  alt={companySettings.companyName || 'Logo'}
+                  className="w-12 h-12 rounded-2xl object-contain bg-white p-1 shadow-lg border border-white/20"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-white text-brand-600 font-black text-xl flex items-center justify-center shadow-lg">
+                  {companySettings?.companyName ? companySettings.companyName.substring(0, 2).toUpperCase() : 'JL'}
+                </div>
+              )}
               <div>
-                <h1 className="text-2xl font-extrabold tracking-tight">Janta Live Setu</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight">
+                  {companySettings?.companyName || 'Janta Live Setu'}
+                </h1>
                 <p className="text-xs text-brand-200 font-semibold tracking-widest uppercase">Office Management CMS</p>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Share } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { useCompany } from '../../contexts/CompanyContext';
 
 // Proper TypeScript definition for BeforeInstallPromptEvent
 export interface BeforeInstallPromptEvent extends Event {
@@ -17,6 +18,7 @@ const STORAGE_KEY_DISMISSED = 'jantaLiveSetuPWADismissedAt';
 const DISMISS_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days cooldown after manual dismiss
 
 export const PWAInstallPrompt: React.FC = () => {
+  const { companySettings } = useCompany();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
@@ -124,13 +126,23 @@ export const PWAInstallPrompt: React.FC = () => {
 
         {/* LOGO & DETAILS */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-brand-600 text-white font-black text-sm flex items-center justify-center shadow-md shrink-0 border border-brand-700">
-            JL
-          </div>
+          {companySettings?.logoUrl ? (
+            <img
+              src={companySettings.logoUrl}
+              alt={companySettings.companyName || 'Company Logo'}
+              className="w-10 h-10 rounded-xl object-contain shadow-md shrink-0 border border-gray-100 bg-white p-0.5"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-brand-600 text-white font-black text-sm flex items-center justify-center shadow-md shrink-0 border border-brand-700">
+              {companySettings?.companyName ? companySettings.companyName.substring(0, 2).toUpperCase() : 'JL'}
+            </div>
+          )}
 
           <div className="truncate">
             <h4 className="text-xs font-black text-gray-900 tracking-tight flex items-center gap-1.5 truncate">
-              {isMobile ? 'Download Janta Live Setu' : 'Install Janta Live Setu'}
+              {isMobile
+                ? `Download ${companySettings?.companyName || 'Janta Live Setu'}`
+                : `Install ${companySettings?.companyName || 'Janta Live Setu'}`}
             </h4>
             <p className="text-[11px] font-semibold text-gray-500 truncate">
               {isIOS
