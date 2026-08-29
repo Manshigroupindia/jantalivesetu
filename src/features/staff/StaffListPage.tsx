@@ -7,7 +7,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { Users, UserPlus, Search, Eye, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { StaffProfile, UserRole } from '../../types';
+import { StaffProfile, UserRole, User, StaffApprovalStatus } from '../../types';
 import { createStaffAccountByDirector } from '../../services/authService';
 import { restoreStaffProfile, deleteStaffProfile } from '../../services/firestoreService';
 import { logAuditEvent } from '../../services/auditService';
