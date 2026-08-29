@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -9,7 +9,7 @@ import { Users, UserPlus, Search, Eye, Trash2, RotateCcw, AlertTriangle } from '
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { StaffProfile, UserRole, User, StaffApprovalStatus } from '../../types';
 import { createStaffAccountByDirector } from '../../services/authService';
-import { restoreStaffProfile, deleteStaffProfile } from '../../services/firestoreService';
+import { restoreStaffProfile, deleteStaffProfile, normalizeStaffData } from '../../services/firestoreService';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -22,6 +22,10 @@ export const StaffListPage: React.FC = () => {
   const { data: rawStaffList, loading: staffLoading } = useRealtimeCollection<StaffProfile>('staffProfiles');
   const { data: rawUsersList, loading: usersLoading } = useRealtimeCollection<User>('users');
   const loading = staffLoading || usersLoading;
+
+  useEffect(() => {
+    normalizeStaffData();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -138,28 +142,56 @@ export const StaffListPage: React.FC = () => {
     });
   };
 
-  // Build single canonical staff list by merging staffProfiles and users
+  const isDeleted = (s: StaffProfile) =>
+    s.approvalStatus?.toLowerCase() === 'deleted' || s.status?.toLowerCase() === 'deleted';
+
+  // Build single canonical staff list by merging staffProfiles and users via Email & UID
   const uniqueStaffMap = new Map<string, StaffProfile>();
+  const emailToKeyMap = new Map<string, string>();
+
+  const getCanonicalKey = (rawUid?: string, rawId?: string, rawEmail?: string): string => {
+    const normEmail = rawEmail?.trim().toLowerCase();
+    if (normEmail && emailToKeyMap.has(normEmail)) {
+      return emailToKeyMap.get(normEmail)!;
+    }
+    const key = rawUid || rawId || normEmail || `unknown-${Math.random()}`;
+    if (normEmail) {
+      emailToKeyMap.set(normEmail, key);
+    }
+    return key;
+  };
 
   // 1. Process staffProfiles
   rawStaffList.forEach((s) => {
-    const key = s.userId || s.id;
-    if (!key) return;
-    uniqueStaffMap.set(key, { ...s, id: key, userId: key });
+    const key = getCanonicalKey(s.userId, s.id, s.email);
+    const isProfileDeleted = isDeleted(s);
+
+    if (!uniqueStaffMap.has(key)) {
+      uniqueStaffMap.set(key, { ...s, id: key, userId: s.userId || key });
+    } else {
+      const existing = uniqueStaffMap.get(key)!;
+      const mergedDeleted = isProfileDeleted || isDeleted(existing);
+      uniqueStaffMap.set(key, {
+        ...existing,
+        ...s,
+        id: key,
+        userId: s.userId || existing.userId || key,
+        approvalStatus: mergedDeleted ? 'deleted' : s.approvalStatus || existing.approvalStatus,
+        status: mergedDeleted ? 'deleted' : s.status || existing.status,
+      });
+    }
   });
 
-  // 2. Merge with users collection to ensure any staff member in users is represented
+  // 2. Merge with users collection
   rawUsersList.forEach((u) => {
     if (u.role === 'director') return;
-    const key = u.uid;
-    if (!key) return;
-
-    const existing = uniqueStaffMap.get(key);
+    const key = getCanonicalKey(u.uid, u.uid, u.email);
     const uStatus = (u.status as string)?.toLowerCase();
-    const isDeletedUser = uStatus === 'deleted';
+    const isUserDeleted = uStatus === 'deleted';
+    const existing = uniqueStaffMap.get(key);
 
     if (existing) {
-      if (isDeletedUser) {
+      if (isUserDeleted || isDeleted(existing)) {
         uniqueStaffMap.set(key, {
           ...existing,
           approvalStatus: 'deleted',
@@ -169,11 +201,13 @@ export const StaffListPage: React.FC = () => {
           previousStatus: u.previousStatus || existing.previousStatus,
           deletionReason: u.deletionReason || existing.deletionReason,
         });
+      } else if (!existing.idNumber && u.idNumber) {
+        uniqueStaffMap.set(key, { ...existing, idNumber: u.idNumber });
       }
     } else {
       uniqueStaffMap.set(key, {
         id: key,
-        userId: key,
+        userId: u.uid || key,
         idNumber: u.idNumber || `JLS-${key.slice(-4)}`,
         fullName: u.name || u.email?.split('@')[0] || 'Staff Member',
         fatherName: '',
@@ -186,8 +220,8 @@ export const StaffListPage: React.FC = () => {
         workingArea: u.city || 'Head Office',
         monthlySalary: u.monthlySalary || 0,
         photoUrl: u.photoUrl || '',
-        approvalStatus: isDeletedUser ? 'deleted' : ((u.status as StaffApprovalStatus) || 'approved'),
-        status: isDeletedUser ? 'deleted' : ((u.status as StaffApprovalStatus) || 'approved'),
+        approvalStatus: isUserDeleted ? 'deleted' : ((u.status as StaffApprovalStatus) || 'approved'),
+        status: isUserDeleted ? 'deleted' : ((u.status as StaffApprovalStatus) || 'approved'),
         deletedAt: u.deletedAt,
         deletedBy: u.deletedBy,
         previousStatus: u.previousStatus,
@@ -200,9 +234,6 @@ export const StaffListPage: React.FC = () => {
       });
     }
   });
-
-  const isDeleted = (s: StaffProfile) =>
-    s.approvalStatus?.toLowerCase() === 'deleted' || s.status?.toLowerCase() === 'deleted';
 
   const allStaffArray = Array.from(uniqueStaffMap.values());
   const activeStaffList = allStaffArray.filter((s) => !isDeleted(s));

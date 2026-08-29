@@ -7,7 +7,7 @@ import { FileUploader } from '../common/FileUploader';
 import { UserCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { saveStaffProfile, setUserDoc, getStaffProfileById } from '../../services/firestoreService';
-import { generateStaffIdNumber } from '../../utils/idGenerator';
+import { getNextUniqueStaffId } from '../../utils/idGenerator';
 import { StaffProfile } from '../../types';
 
 export const StaffProfileWizard: React.FC = () => {
@@ -61,7 +61,7 @@ export const StaffProfileWizard: React.FC = () => {
     setError(null);
 
     try {
-      const idNumber = existingProfile?.idNumber || generateStaffIdNumber();
+      const idNumber = existingProfile?.idNumber || (await getNextUniqueStaffId());
       const configuredSalary = existingProfile?.monthlySalary || 12000;
 
       await saveStaffProfile({

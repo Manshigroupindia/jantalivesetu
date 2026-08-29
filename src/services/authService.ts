@@ -7,6 +7,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { User, UserRole } from '../types';
+import { getNextUniqueStaffId } from '../utils/idGenerator';
 
 export const DIRECTOR_FIXED_EMAIL = 'devenjhaofficial@gmail.com';
 
@@ -112,6 +113,8 @@ export async function createStaffAccountByDirector(data: {
 
   const pinHash = simpleHashPin(data.pin);
 
+  const uniqueIdNumber = await getNextUniqueStaffId();
+
   const newUser: User = {
     uid,
     email: normalizedEmail,
@@ -122,6 +125,7 @@ export async function createStaffAccountByDirector(data: {
     pinHash,
     name: data.fullName,
     designation: data.designation,
+    idNumber: uniqueIdNumber,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -132,7 +136,7 @@ export async function createStaffAccountByDirector(data: {
   await setDoc(doc(db, 'staffProfiles', uid), {
     id: uid,
     userId: uid,
-    idNumber: `JLS-${Date.now().toString().slice(-4)}`,
+    idNumber: uniqueIdNumber,
     fullName: data.fullName,
     email: normalizedEmail,
     contactNumber: data.contactNumber,

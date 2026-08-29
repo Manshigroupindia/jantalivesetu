@@ -33,6 +33,7 @@ import {
   CompanyHoliday,
   ClientRecord
 } from '../types';
+import { getNextUniqueStaffId } from '../utils/idGenerator';
 
 export function subscribeToCollection<T>(
   collectionName: string,
@@ -175,43 +176,153 @@ export async function softDeleteStaffProfile(userId: string, deletedBy: string, 
   );
 
   // 2. Update staffProfiles/{userId} document in Firestore (creating canonical doc if missing)
-  if (staffProfile) {
-    await saveStaffProfile({
-      ...staffProfile,
-      approvalStatus: 'deleted',
-      status: 'deleted',
-      deletedAt: now,
-      deletedBy,
-      previousStatus: currentStatus,
-      deletionReason: reason || '',
+  const canonicalIdNumber = staffProfile?.idNumber || userDocData?.idNumber || (await getNextUniqueStaffId());
+
+  await saveStaffProfile({
+    ...(staffProfile || {}),
+    id: userId,
+    userId,
+    idNumber: canonicalIdNumber,
+    fullName: staffProfile?.fullName || userDocData?.name || userDocData?.email?.split('@')[0] || 'Staff Member',
+    email: staffProfile?.email || userDocData?.email || '',
+    contactNumber: staffProfile?.contactNumber || userDocData?.phone || 'N/A',
+    designation: staffProfile?.designation || userDocData?.designation || 'Staff Member',
+    workingArea: staffProfile?.workingArea || userDocData?.city || 'Head Office',
+    monthlySalary: staffProfile?.monthlySalary || userDocData?.monthlySalary || 0,
+    photoUrl: staffProfile?.photoUrl || userDocData?.photoUrl || '',
+    approvalStatus: 'deleted',
+    status: 'deleted',
+    deletedAt: now,
+    deletedBy,
+    previousStatus: currentStatus,
+    deletionReason: reason || '',
+  });
+
+  // 3. Clean up any orphan profile documents matching email or userId
+  const targetEmail = (staffProfile?.email || userDocData?.email)?.trim().toLowerCase();
+  if (targetEmail) {
+    try {
+      const q = query(collection(db, 'staffProfiles'), where('email', '==', targetEmail));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        if (d.id !== userId) {
+          await deleteDoc(doc(db, 'staffProfiles', d.id));
+        }
+      }
+    } catch (err) {
+      console.warn('Error cleaning up orphan profile docs:', err);
+    }
+  }
+}
+
+/**
+ * Normalizes staff records across users and staffProfiles collections in Firestore.
+ * Ensures single canonical records per staff member, synchronizes deleted status,
+ * cleans up orphan documents, and resolves duplicate Staff IDs automatically.
+ */
+export async function normalizeStaffData(): Promise<void> {
+  try {
+    const [usersSnap, staffProfilesSnap] = await Promise.all([
+      getDocs(collection(db, 'users')),
+      getDocs(collection(db, 'staffProfiles')),
+    ]);
+
+    const usersMap = new Map<string, User>();
+    usersSnap.docs.forEach((d) => {
+      usersMap.set(d.id, { uid: d.id, ...d.data() } as User);
     });
-  } else {
-    await saveStaffProfile({
-      id: userId,
-      userId,
-      idNumber: userDocData?.idNumber || `JLS-${userId.slice(-4)}`,
-      fullName: userDocData?.name || userDocData?.email?.split('@')[0] || 'Staff Member',
-      fatherName: '',
-      motherName: '',
-      email: userDocData?.email || '',
-      contactNumber: userDocData?.phone || 'N/A',
-      emergencyContact: '',
-      address: userDocData?.address || '',
-      designation: userDocData?.designation || 'Staff Member',
-      workingArea: userDocData?.city || 'Head Office',
-      monthlySalary: userDocData?.monthlySalary || 0,
-      photoUrl: userDocData?.photoUrl || '',
-      approvalStatus: 'deleted',
-      status: 'deleted',
-      joinedDate: userDocData?.createdAt ? userDocData.createdAt.split('T')[0] : now.split('T')[0],
-      validUpto: '31 DEC 2028',
-      createdById: deletedBy,
-      deletedAt: now,
-      deletedBy,
-      previousStatus: currentStatus,
-      deletionReason: reason || '',
-      createdAt: userDocData?.createdAt || now,
+
+    const profilesByEmail = new Map<string, StaffProfile[]>();
+    const profilesByUid = new Map<string, StaffProfile[]>();
+
+    staffProfilesSnap.docs.forEach((d) => {
+      const p = { id: d.id, ...d.data() } as StaffProfile;
+      const email = p.email?.trim().toLowerCase();
+      if (email) {
+        if (!profilesByEmail.has(email)) profilesByEmail.set(email, []);
+        profilesByEmail.get(email)!.push(p);
+      }
+      const uid = p.userId || (usersMap.has(d.id) ? d.id : undefined);
+      if (uid) {
+        if (!profilesByUid.has(uid)) profilesByUid.set(uid, []);
+        profilesByUid.get(uid)!.push(p);
+      }
     });
+
+    // 1. Synchronize users & staffProfiles status and consolidate orphan docs
+    for (const [uid, user] of usersMap.entries()) {
+      if (user.role === 'director') continue;
+      const userEmail = user.email?.trim().toLowerCase();
+      const isDeletedInUser = user.status?.toLowerCase() === 'deleted';
+
+      const matchingProfiles = [
+        ...(profilesByUid.get(uid) || []),
+        ...(userEmail ? profilesByEmail.get(userEmail) || [] : []),
+      ];
+
+      const uniqueProfiles = Array.from(new Map(matchingProfiles.map((p) => [p.id, p])).values());
+      const isDeletedInAnyProfile = uniqueProfiles.some(
+        (p) => p.approvalStatus?.toLowerCase() === 'deleted' || p.status?.toLowerCase() === 'deleted'
+      );
+
+      const shouldBeDeleted = isDeletedInUser || isDeletedInAnyProfile;
+      const targetStatus: StaffApprovalStatus = shouldBeDeleted ? 'deleted' : ((user.status as StaffApprovalStatus) || 'approved');
+
+      if (shouldBeDeleted && user.status?.toLowerCase() !== 'deleted') {
+        await setDoc(doc(db, 'users', uid), { status: 'deleted', approved: false, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+
+      let canonicalProfile = uniqueProfiles.find((p) => p.id === uid);
+      if (!canonicalProfile && uniqueProfiles.length > 0) {
+        const source = uniqueProfiles[0];
+        canonicalProfile = {
+          ...source,
+          id: uid,
+          userId: uid,
+          idNumber: user.idNumber || source.idNumber || `JLS-${uid.slice(-4)}`,
+          approvalStatus: targetStatus,
+          status: targetStatus,
+        };
+        await setDoc(doc(db, 'staffProfiles', uid), canonicalProfile, { merge: true });
+      } else if (canonicalProfile) {
+        if (canonicalProfile.approvalStatus?.toLowerCase() !== targetStatus || canonicalProfile.status?.toLowerCase() !== targetStatus) {
+          await setDoc(doc(db, 'staffProfiles', uid), { approvalStatus: targetStatus, status: targetStatus, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+      }
+
+      for (const orphan of uniqueProfiles) {
+        if (orphan.id !== uid) {
+          await deleteDoc(doc(db, 'staffProfiles', orphan.id)).catch(() => {});
+        }
+      }
+    }
+
+    // 2. Fix duplicate Staff IDs (e.g., Rohit & Kumar Anubhav both having JL-STAFF-2026-0001)
+    const assignedStaffIds = new Map<string, string>(); // idNumber -> uid
+
+    for (const [uid, user] of usersMap.entries()) {
+      if (user.role === 'director') continue;
+
+      const profileSnap = await getDoc(doc(db, 'staffProfiles', uid));
+      const profileData = profileSnap.exists() ? (profileSnap.data() as StaffProfile) : null;
+      const currentIdNumber = profileData?.idNumber || user.idNumber;
+
+      if (currentIdNumber && currentIdNumber.startsWith('JL-STAFF-')) {
+        if (assignedStaffIds.has(currentIdNumber) && assignedStaffIds.get(currentIdNumber) !== uid) {
+          // Duplicate Staff ID collision detected! Reassign second user a new unique collision-safe Staff ID
+          const newUniqueId = await getNextUniqueStaffId();
+          await setDoc(doc(db, 'users', uid), { idNumber: newUniqueId }, { merge: true });
+          if (profileSnap.exists()) {
+            await setDoc(doc(db, 'staffProfiles', uid), { idNumber: newUniqueId }, { merge: true });
+          }
+          assignedStaffIds.set(newUniqueId, uid);
+        } else {
+          assignedStaffIds.set(currentIdNumber, uid);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error in normalizeStaffData:', err);
   }
 }
 
