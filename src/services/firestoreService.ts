@@ -615,8 +615,31 @@ export async function updateExpenseStatus(
 
 // Tea & Snacks
 export async function createTeaSnackLog(log: Omit<TeaSnackLog, 'id'>): Promise<string> {
-  const docRef = await addDoc(collection(db, 'teaSnackLogs'), log);
-  return docRef.id;
+  // Query check for duplicate date
+  const q = query(collection(db, 'teaSnackLogs'), where('date', '==', log.date), limit(1));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const existingDoc = { id: snap.docs[0].id, ...snap.docs[0].data() } as TeaSnackLog;
+    const err: any = new Error('Tea/Snacks record already exists for this date.');
+    err.isDuplicate = true;
+    err.existingRecord = existingDoc;
+    throw err;
+  }
+
+  // Use deterministic doc ID for race condition protection
+  const deterministicId = `tea_${log.date}`;
+  const docRef = doc(db, 'teaSnackLogs', deterministicId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const existingDoc = { id: docSnap.id, ...docSnap.data() } as TeaSnackLog;
+    const err: any = new Error('Tea/Snacks record already exists for this date.');
+    err.isDuplicate = true;
+    err.existingRecord = existingDoc;
+    throw err;
+  }
+
+  await setDoc(docRef, log);
+  return deterministicId;
 }
 
 export async function updateTeaSnackLog(
@@ -637,11 +660,50 @@ export async function deleteTeaSnackLog(logId: string): Promise<void> {
 
 // Water Records
 export async function createWaterRecord(record: Omit<WaterRecord, 'id'>): Promise<string> {
-  const docRef = await addDoc(collection(db, 'waterRecords'), record);
-  return docRef.id;
+  // Query check for duplicate date
+  const q = query(collection(db, 'waterRecords'), where('date', '==', record.date), limit(1));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const existingDoc = { id: snap.docs[0].id, ...snap.docs[0].data() } as WaterRecord;
+    const err: any = new Error('Water record already exists for this date.');
+    err.isDuplicate = true;
+    err.existingRecord = existingDoc;
+    throw err;
+  }
+
+  // Use deterministic doc ID for race condition protection
+  const deterministicId = `water_${record.date}`;
+  const docRef = doc(db, 'waterRecords', deterministicId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const existingDoc = { id: docSnap.id, ...docSnap.data() } as WaterRecord;
+    const err: any = new Error('Water record already exists for this date.');
+    err.isDuplicate = true;
+    err.existingRecord = existingDoc;
+    throw err;
+  }
+
+  await setDoc(docRef, record);
+  return deterministicId;
 }
 
 export const saveWaterRecord = createWaterRecord;
+
+export async function updateWaterRecord(
+  recordId: string,
+  updates: Partial<WaterRecord>
+): Promise<void> {
+  const docRef = doc(db, 'waterRecords', recordId);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function deleteWaterRecord(recordId: string): Promise<void> {
+  const docRef = doc(db, 'waterRecords', recordId);
+  await deleteDoc(docRef);
+}
 
 // Electricity Records
 export async function createElectricityRecord(record: Omit<ElectricityRecord, 'id'>): Promise<string> {

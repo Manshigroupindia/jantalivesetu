@@ -9,6 +9,7 @@ import {
   Edit3,
   Trash2,
   AlertCircle,
+  AlertTriangle,
   X,
   Plus,
   History
@@ -20,7 +21,7 @@ import {
   updateTeaSnackLog,
   deleteTeaSnackLog
 } from '../../services/firestoreService';
-import { getCurrentDateISO, getCurrentMonthISO } from '../../utils/dateUtils';
+import { getCurrentDateISO, getCurrentMonthISO, formatDateFormatted } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -63,7 +64,7 @@ export const TeaSnacksPage: React.FC = () => {
     }
   }, [companySettings?.teaUnitPrice, itemType]);
 
-  // Derived Month Options (Last 12 months + current month)
+  // Derived Month Options (Last 12 months)
   const monthOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
     const now = new Date();
@@ -77,6 +78,11 @@ export const TeaSnacksPage: React.FC = () => {
     }
     return options;
   }, []);
+
+  // Check if a record already exists for the selected date
+  const existingTeaLog = useMemo(() => {
+    return logs.find((l) => l.date === date);
+  }, [logs, date]);
 
   // Filter logs for selected month
   const monthLogs = useMemo(() => {
@@ -128,7 +134,18 @@ export const TeaSnacksPage: React.FC = () => {
   const safeEditUnitPrice = isNaN(editUnitPrice) || editUnitPrice < 0 ? 0 : editUnitPrice;
   const editTotalPrice = safeEditQuantity * safeEditUnitPrice;
 
-  // Add Log Handler
+  // Open Edit Modal
+  const handleOpenEdit = (log: TeaSnackLog) => {
+    setEditingLog(log);
+    setEditItemType(log.itemType || log.type || 'tea');
+    setEditQuantity(log.quantity || log.count || 1);
+    setEditUnitPrice(log.unitPrice || log.amount || 10);
+    setEditDate(log.date || getCurrentDateISO());
+    setEditNotes(log.notes || '');
+    setEditReason('');
+  };
+
+  // Add Log Handler (with duplicate date protection)
   const handleAddLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userDoc) {
@@ -138,6 +155,18 @@ export const TeaSnacksPage: React.FC = () => {
 
     if (safeQuantity <= 0) {
       showToast('Please enter a valid quantity of 1 or more.', 'warning');
+      return;
+    }
+
+    // Duplicate date check
+    if (existingTeaLog) {
+      showConfirm({
+        title: 'Tea/Snacks record already exists for this date.',
+        message: `A Tea/Snacks record has already been added for ${formatDateFormatted(date)}.\n\nIf you want to increase/decrease the tea cups, change the tea amount, or update the snacks details, please edit the existing record for this date.`,
+        confirmText: 'Edit Existing Record',
+        cancelText: 'Cancel',
+        onConfirm: () => handleOpenEdit(existingTeaLog),
+      });
       return;
     }
 
@@ -167,25 +196,25 @@ export const TeaSnacksPage: React.FC = () => {
       showToast('Tea / Snacks log saved successfully.', 'success');
     } catch (err: any) {
       console.error('Failed to log tea/snacks entry:', err);
-      if (err?.code === 'permission-denied') {
+      if (err?.isDuplicate || err?.message?.includes('already exists')) {
+        const targetLog = err.existingRecord || existingTeaLog;
+        showConfirm({
+          title: 'Tea/Snacks record already exists for this date.',
+          message: `A Tea/Snacks record has already been added for ${formatDateFormatted(date)}.\n\nIf you want to increase/decrease the tea cups, change the tea amount, or update the snacks details, please edit the existing record for this date.`,
+          confirmText: 'Edit Existing Record',
+          cancelText: 'Cancel',
+          onConfirm: () => {
+            if (targetLog) handleOpenEdit(targetLog);
+          },
+        });
+      } else if (err?.code === 'permission-denied') {
         showToast('Permission Denied: You do not have permission to write to Tea & Snacks logs.', 'error');
       } else {
-        showToast(err?.message || 'Failed to save tea/snacks entry. Please check connection and try again.', 'error');
+        showToast(err?.message || 'Failed to save tea/snacks entry. Please try again.', 'error');
       }
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // Open Edit Modal
-  const handleOpenEdit = (log: TeaSnackLog) => {
-    setEditingLog(log);
-    setEditItemType(log.itemType || log.type || 'tea');
-    setEditQuantity(log.quantity || log.count || 1);
-    setEditUnitPrice(log.unitPrice || log.amount || 10);
-    setEditDate(log.date || getCurrentDateISO());
-    setEditNotes(log.notes || '');
-    setEditReason('');
   };
 
   // Submit Edit Handler
@@ -246,8 +275,10 @@ export const TeaSnacksPage: React.FC = () => {
 
     showConfirm({
       title: 'Delete Entry',
-      message: 'Are you sure you want to delete this Tea/Snacks entry permanently?',
+      message: `Are you sure you want to delete the Tea/Snacks record for ${log.date}?`,
       isDanger: true,
+      confirmText: 'Delete Record',
+      cancelText: 'Cancel',
       onConfirm: async () => {
         try {
           await deleteTeaSnackLog(log.id);
@@ -377,6 +408,29 @@ export const TeaSnacksPage: React.FC = () => {
               onChange={(e) => setDate(e.target.value)}
               required
             />
+
+            {/* DUPLICATE DATE WARNING BANNER */}
+            {existingTeaLog && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs space-y-1.5 animate-fadeIn">
+                <p className="font-bold flex items-center gap-1.5 text-amber-900">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  Tea/Snacks record already exists for this date.
+                </p>
+                <p className="text-[11px] text-amber-700">
+                  Existing entry: <span className="font-bold">{existingTeaLog.quantity || existingTeaLog.count}x {(existingTeaLog.itemType || existingTeaLog.type || 'tea').toUpperCase()}</span> @ {formatINR(existingTeaLog.unitPrice || existingTeaLog.amount || 0)}/unit.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-black border-amber-300 text-amber-900 hover:bg-amber-100"
+                  icon={<Edit3 className="w-3.5 h-3.5" />}
+                  onClick={() => handleOpenEdit(existingTeaLog)}
+                >
+                  Edit Existing Record
+                </Button>
+              </div>
+            )}
 
             <Select
               label="Item Type"
