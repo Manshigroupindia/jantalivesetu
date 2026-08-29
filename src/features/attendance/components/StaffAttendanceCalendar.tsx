@@ -384,7 +384,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
             <span className="px-1 py-0.2 bg-purple-100 text-purple-700 rounded text-[10px] font-black">✎</span>
             <span>Manual / Edited Entry</span>
           </div>
-        </div>
+          <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-gray-300 shadow-sm" />
             <span>⚪ Future Date</span>
           </div>
@@ -407,7 +407,11 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
 
               <div className="flex flex-col items-end gap-1">
                 {selectedDayDetail.status === 'present' && <Badge variant="success" size="md">Present</Badge>}
-                {selectedDayDetail.status === 'manual' && <Badge variant="brand" size="md" className="bg-purple-100 text-purple-800">Manually Added</Badge>}
+                {selectedDayDetail.status === 'half_day' && (
+                  <Badge variant="warning" size="md" className="bg-amber-100 text-amber-900 border-amber-300">
+                    Half Day (0.5x)
+                  </Badge>
+                )}
                 {selectedDayDetail.status === 'sunday' && (
                   <Badge variant="warning" size="md">
                     {selectedDayDetail.isFifthSunday ? '5th Sunday (Neutral)' : 'Paid Sunday'}
