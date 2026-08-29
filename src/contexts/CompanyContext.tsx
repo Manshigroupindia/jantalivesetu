@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CompanySettings } from '../types';
+import { updateFavicon } from '../utils/favicon';
 
 interface CompanyContextType {
   companySettings: CompanySettings | null;
@@ -82,6 +83,11 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     return () => unsub();
   }, []);
+
+  // Dynamically update browser tab favicon whenever companySettings load or change
+  useEffect(() => {
+    updateFavicon(companySettings?.logoUrl, companySettings?.updatedAt);
+  }, [companySettings?.logoUrl, companySettings?.updatedAt]);
 
   const refetchCompanySettings = async (): Promise<CompanySettings | null> => {
     try {
