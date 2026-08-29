@@ -1,4 +1,5 @@
 import { SalaryCalculationResult, AttendanceRecord, CompanyHoliday } from '../types';
+import { isHalfDayCheckIn } from '../utils/dateUtils';
 
 export interface SalaryInputData {
   userId?: string;
@@ -12,18 +13,51 @@ export interface SalaryInputData {
 }
 
 /**
+ * Resolves attendance status and payable day fraction (1.0 for Full Day, 0.5 for Half Day, 0 for Absent).
+ * Applies the 2:00 PM cutoff rule to both NEW and EXISTING attendance records!
+ */
+export function getAttendanceStatusAndFraction(att?: AttendanceRecord): { status: 'PRESENT' | 'HALF_DAY' | 'ABSENT'; fraction: number } {
+  if (!att) {
+    return { status: 'ABSENT', fraction: 0 };
+  }
+
+  if (att.status === 'absent') {
+    return { status: 'ABSENT', fraction: 0 };
+  }
+
+  if (att.payableFraction !== undefined && att.payableFraction !== null) {
+    if (att.payableFraction === 0) return { status: 'ABSENT', fraction: 0 };
+    if (att.payableFraction === 0.5) return { status: 'HALF_DAY', fraction: 0.5 };
+    if (att.payableFraction === 1) return { status: 'PRESENT', fraction: 1 };
+  }
+
+  if (att.status === 'half_day') {
+    return { status: 'HALF_DAY', fraction: 0.5 };
+  }
+
+  // 2:00 PM Check-in Cutoff Rule: > 14:00 is HALF DAY for BOTH new & existing records
+  if (att.checkIn && isHalfDayCheckIn(att.checkIn)) {
+    return { status: 'HALF_DAY', fraction: 0.5 };
+  }
+
+  const isWorkedDay =
+    att.status === 'present' ||
+    att.status === 'on_duty' ||
+    att.status === 'completed' ||
+    att.status === 'auto_closed' ||
+    att.isAutoClosed === true ||
+    att.attendanceType === 'MANUAL' ||
+    Boolean(att.checkIn);
+
+  if (isWorkedDay) {
+    return { status: 'PRESENT', fraction: 1 };
+  }
+
+  return { status: 'ABSENT', fraction: 0 };
+}
+
+/**
  * Deterministic Central Salary Calculation Engine for Janta Live Setu
- * 
- * Rules:
- * 1. Base Daily Rate = monthlySalary / 30.
- * 2. 30-day salary basis structure (Max base payable days = 30).
- * 3. Maximum 4 Paid Sundays per month.
- *    - First 4 Sundays are paid.
- *    - 5th Sunday (if any) is NEUTRAL (0 pay addition, 0 deduction, outside 30-day basis).
- * 4. Configured company holidays are paid (no double counting on Sundays).
- * 5. 1 Emergency Leave per month is paid (0 deduction).
- * 6. 31st calendar day is NEUTRAL for salary calculation (0 pay addition, 0 deduction).
- * 7. Unpaid absence deducts dailyRate per day from 30-day salary basis.
  */
 export function calculateSalaryBreakdown(
   monthlySalaryOrInput: number | SalaryInputData,
@@ -110,7 +144,9 @@ export function calculateSalaryBreakdown(
     });
   }
 
-  let workedDays = 0;
+  let fullDaysCount = 0;
+  let halfDaysCount = 0;
+  let workedDaysUnits = 0;
   let paidSundays = 0;
   let paidHolidays = 0;
   let emergencyLeavesUsed = 0;
@@ -125,32 +161,27 @@ export function calculateSalaryBreakdown(
     const isCompanyHoliday = holidaySet.has(dateStr);
     const attendance = attendanceMap.get(dateStr);
 
-    const isWorkedDay = attendance && (
-      attendance.status === 'present' ||
-      attendance.status === 'on_duty' ||
-      attendance.status === 'completed' ||
-      attendance.status === 'auto_closed' ||
-      attendance.isAutoClosed === true ||
-      attendance.attendanceType === 'MANUAL' ||
-      Boolean(attendance.checkIn)
-    );
-
     // Rule for 5th Sunday: Neutral (0 pay addition, 0 deduction)
     if (isFifthSunday) {
       neutralDaysCount++;
       continue;
     }
 
-    // Rule for 31st Calendar Day:
-    // Neutral for 30-day salary model calculation (0 pay addition, 0 deduction)
+    // Rule for 31st Calendar Day: Neutral (0 pay addition, 0 deduction)
     if (day === 31) {
       has31stNeutralDay = true;
       neutralDaysCount++;
       continue;
     }
 
-    if (isWorkedDay) {
-      workedDays++;
+    const { status: attStatus, fraction } = getAttendanceStatusAndFraction(attendance);
+
+    if (fraction === 1) {
+      fullDaysCount++;
+      workedDaysUnits += 1;
+    } else if (fraction === 0.5) {
+      halfDaysCount++;
+      workedDaysUnits += 0.5;
     } else if (attendance && attendance.status === 'paid_leave') {
       if (emergencyLeavesUsed < emergencyLeaveAllowed) {
         emergencyLeavesUsed++;
@@ -174,7 +205,7 @@ export function calculateSalaryBreakdown(
   }
 
   // Total paid days before cap
-  const totalPaidDaysUnits = workedDays + paidSundays + paidHolidays + emergencyLeavesUsed;
+  const totalPaidDaysUnits = workedDaysUnits + paidSundays + paidHolidays + emergencyLeavesUsed;
 
   // Cap total paid units at 30 days for 30-day salary basis
   const cappedPaidUnits = Math.min(30, totalPaidDaysUnits);
@@ -196,13 +227,16 @@ export function calculateSalaryBreakdown(
   const netSalaryBeforeExpenses = Math.max(0, grossSalary - advanceDeduction);
   const finalTotalPayable = netSalaryBeforeExpenses + approvedExpensesTotal;
 
+  const fullDayPayAmount = Math.round(fullDaysCount * dailyRate);
+  const halfDayPayAmount = Math.round(halfDaysCount * (dailyRate / 2));
+
   return {
     userId,
     month,
     monthlyBaseSalary: monthlySalary,
     dailyRate,
     daysInMonth,
-    workedDays,
+    workedDays: workedDaysUnits,
     paidSundays,
     paidHolidays,
     emergencyLeavesUsed,
@@ -218,10 +252,14 @@ export function calculateSalaryBreakdown(
     has31stNeutralDay,
     neutralDaysCount,
 
-    // Aliases for UI Components & SalaryPage
+    // Detailed breakdown & aliases for UI Components & SalaryPage
     baseSalary: monthlySalary,
     totalDaysInMonth: daysInMonth,
-    presentDays: workedDays,
+    presentDays: workedDaysUnits,
+    fullDaysCount,
+    fullDayPayAmount,
+    halfDaysCount,
+    halfDayPayAmount,
     sundaysCount: paidSundays,
     paidHolidaysCount: paidHolidays,
     emergencyLeaveCount: emergencyLeavesUsed,

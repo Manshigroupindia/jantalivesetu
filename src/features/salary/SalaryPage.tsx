@@ -263,10 +263,17 @@ export const SalaryPage: React.FC = () => {
 
             {/* DETAILED LOG */}
             <div className="space-y-2 border-t pt-4 text-xs text-gray-700">
-              <div className="flex justify-between p-2 rounded-lg bg-gray-50">
-                <span className="font-medium text-gray-700">Present Days:</span>
-                <span className="font-bold text-gray-900">{breakdown.presentDays} days</span>
+              <div className="flex justify-between p-2 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-100">
+                <span className="font-bold text-emerald-900">Full Days Present (1.0x):</span>
+                <span className="font-extrabold text-emerald-700">{breakdown.fullDaysCount ?? breakdown.presentDays} days ({formatINR(breakdown.fullDayPayAmount ?? Math.round((breakdown.fullDaysCount || 0) * breakdown.dailyRate))})</span>
               </div>
+
+              {Boolean(breakdown.halfDaysCount && breakdown.halfDaysCount > 0) && (
+                <div className="flex justify-between p-2 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 font-semibold">
+                  <span className="font-bold text-amber-900">Half Days (0.5x Pay - After 2 PM Check-in):</span>
+                  <span className="font-extrabold text-amber-700">{breakdown.halfDaysCount} days ({formatINR(breakdown.halfDayPayAmount ?? 0)})</span>
+                </div>
+              )}
 
               <div className="flex justify-between p-2 rounded-lg bg-gray-50">
                 <span className="font-medium text-gray-700">Paid Sundays (Max 4):</span>

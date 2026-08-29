@@ -8,20 +8,31 @@ import { Modal } from '../../components/ui/Modal';
 import { DutyCard } from '../dashboard/components/DutyCard';
 import { GoogleMapsButton } from '../../components/common/GoogleMapsButton';
 import { StaffAttendanceCalendar } from './components/StaffAttendanceCalendar';
-import { Clock, Calendar as CalendarIcon, Search, PlusCircle, ListFilter, CalendarDays } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, Search, PlusCircle, ListFilter, CalendarDays, Edit3, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AttendanceRecord } from '../../types';
-import { getCurrentDateISO } from '../../utils/dateUtils';
+import { getCurrentDateISO, isHalfDayCheckIn } from '../../utils/dateUtils';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import { createManualAttendance, autoCloseStaleAttendance } from '../../services/firestoreService';
+import { createManualAttendance, updateManualAttendance, autoCloseStaleAttendance } from '../../services/firestoreService';
 import { where } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { useActiveStaff } from '../../hooks/useActiveStaff';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+function parseTimeString(timeStr?: string) {
+  if (!timeStr) return { hour: '09', minute: '30', period: 'AM' as 'AM' | 'PM' };
+  const match = timeStr.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return { hour: '09', minute: '30', period: 'AM' as 'AM' | 'PM' };
+  return {
+    hour: String(parseInt(match[1], 10)).padStart(2, '0'),
+    minute: String(parseInt(match[2], 10)).padStart(2, '0'),
+    period: match[3].toUpperCase() as 'AM' | 'PM',
+  };
+}
 
 export const AttendancePage: React.FC = () => {
   const { userDoc, staffProfile: currentUserProfile } = useAuth();
@@ -35,10 +46,15 @@ export const AttendancePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [manualModalOpen, setManualModalOpen] = useState(false);
 
+  // Edit & Duplicate Conflict state
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [attendanceStatus, setAttendanceStatus] = useState<'present' | 'half_day' | 'absent'>('present');
+  const [duplicateConflictOpen, setDuplicateConflictOpen] = useState(false);
+
   // Calendar Director Staff Filter
   const [selectedDirectorStaffId, setSelectedDirectorStaffId] = useState<string>(userDoc?.uid || '');
 
-  // Form State for Manual Attendance
+  // Form State for Manual Attendance / Edit
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [manualDate, setManualDate] = useState(getCurrentDateISO());
 
@@ -90,14 +106,60 @@ export const AttendancePage: React.FC = () => {
     return matchesDate && matchesSearch;
   });
 
-  const handleCreateManualAttendance = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOpenAddManual = () => {
+    setEditingRecord(null);
+    setSelectedStaffId(activeStaffList[0]?.userId || '');
+    setManualDate(getCurrentDateISO());
+    setAttendanceStatus('present');
+    setInHour('09');
+    setInMinute('30');
+    setInPeriod('AM');
+    setOutHour('06');
+    setOutMinute('00');
+    setOutPeriod('PM');
+    setLocationText('Head Office, Patna');
+    setManualReason('');
+    setManualModalOpen(true);
+  };
+
+  const handleOpenEditManual = (log: AttendanceRecord) => {
+    setEditingRecord(log);
+    setSelectedStaffId(log.userId);
+    setManualDate(log.date);
+    
+    let initialStatus: 'present' | 'half_day' | 'absent' = 'present';
+    if (log.status === 'absent') {
+      initialStatus = 'absent';
+    } else if (log.status === 'half_day' || log.payableFraction === 0.5 || isHalfDayCheckIn(log.checkIn)) {
+      initialStatus = 'half_day';
+    } else {
+      initialStatus = 'present';
+    }
+    setAttendanceStatus(initialStatus);
+
+    const inT = parseTimeString(log.checkIn);
+    setInHour(inT.hour);
+    setInMinute(inT.minute);
+    setInPeriod(inT.period);
+
+    const outT = parseTimeString(log.checkOut);
+    setOutHour(outT.hour);
+    setOutMinute(outT.minute);
+    setOutPeriod(outT.period);
+
+    setLocationText(log.checkInLocation?.latitude ? 'GPS Location Recorded' : 'Head Office, Patna');
+    setManualReason(log.manualReason || log.editReason || '');
+    setManualModalOpen(true);
+  };
+
+  const handleSaveAttendance = async (e?: React.FormEvent, replaceExisting: boolean = false) => {
+    if (e) e.preventDefault();
     if (!selectedStaffId) {
       showToast('Please select a staff member.', 'warning');
       return;
     }
     if (!manualReason.trim()) {
-      showToast('Please provide a mandatory reason for manual attendance correction.', 'warning');
+      showToast('Please provide a reason for manual attendance entry / correction.', 'warning');
       return;
     }
 
@@ -110,29 +172,57 @@ export const AttendancePage: React.FC = () => {
     const formattedCheckIn = `${inHour}:${inMinute} ${inPeriod}`;
     const formattedCheckOut = `${outHour}:${outMinute} ${outPeriod}`;
 
-    requirePinVerification('Authorize Manual Attendance Record Entry', async () => {
+    const actionText = editingRecord ? 'Authorize Attendance Record Edit' : 'Authorize Manual Attendance Record Entry';
+
+    requirePinVerification(actionText, async () => {
       setSubmittingManual(true);
       try {
-        await createManualAttendance({
-          userId: targetStaff.userId,
-          userName: targetStaff.fullName,
-          userDesignation: targetStaff.designation,
-          date: manualDate,
-          checkIn: formattedCheckIn,
-          checkOut: formattedCheckOut,
-          locationText: locationText.trim() || 'Head Office, Patna',
-          manualReason: manualReason.trim(),
-          createdById: userDoc?.uid || 'director',
-          createdByName: currentUserProfile?.fullName || userDoc?.name || 'Director',
-        });
+        if (editingRecord) {
+          await updateManualAttendance(editingRecord.id, {
+            userId: targetStaff.userId,
+            userName: targetStaff.fullName,
+            userDesignation: targetStaff.designation,
+            date: manualDate,
+            status: attendanceStatus,
+            checkIn: formattedCheckIn,
+            checkOut: formattedCheckOut,
+            locationText: locationText.trim() || 'Head Office, Patna',
+            manualReason: manualReason.trim(),
+            editedById: userDoc?.uid || 'director',
+            editedByName: currentUserProfile?.fullName || userDoc?.name || 'Director',
+            replaceExistingIfDuplicate: replaceExisting,
+          });
+          showToast('Attendance record updated successfully.', 'success');
+        } else {
+          await createManualAttendance({
+            userId: targetStaff.userId,
+            userName: targetStaff.fullName,
+            userDesignation: targetStaff.designation,
+            date: manualDate,
+            checkIn: formattedCheckIn,
+            checkOut: formattedCheckOut,
+            locationText: locationText.trim() || 'Head Office, Patna',
+            manualReason: manualReason.trim(),
+            createdById: userDoc?.uid || 'director',
+            createdByName: currentUserProfile?.fullName || userDoc?.name || 'Director',
+            status: attendanceStatus,
+            replaceExistingIfDuplicate: replaceExisting,
+          });
+          showToast('Manual attendance record added successfully.', 'success');
+        }
 
         setManualModalOpen(false);
+        setDuplicateConflictOpen(false);
+        setEditingRecord(null);
         setManualReason('');
         setSelectedStaffId('');
-        showToast('Manual attendance record added successfully.', 'success');
       } catch (err: any) {
         console.error('Manual attendance error:', err);
-        showToast(err?.message || 'Failed to create manual attendance record.', 'error');
+        if (err?.message === 'DUPLICATE_DATE_CONFLICT') {
+          setDuplicateConflictOpen(true);
+        } else {
+          showToast(err?.message || 'Failed to save attendance record.', 'error');
+        }
       } finally {
         setSubmittingManual(false);
       }
@@ -157,7 +247,7 @@ export const AttendancePage: React.FC = () => {
           <Button
             variant="primary"
             icon={<PlusCircle className="w-4 h-4" />}
-            onClick={() => setManualModalOpen(true)}
+            onClick={handleOpenAddManual}
           >
             + Manual Attendance
           </Button>
@@ -204,7 +294,7 @@ export const AttendancePage: React.FC = () => {
           canSelectStaff={isDirector}
           staffList={activeStaffList}
           onSelectStaffId={(id) => setSelectedDirectorStaffId(id)}
-          onOpenManualModal={canManageAttendance ? () => setManualModalOpen(true) : undefined}
+          onOpenManualModal={canManageAttendance ? handleOpenAddManual : undefined}
         />
       )}
 
@@ -251,12 +341,15 @@ export const AttendancePage: React.FC = () => {
                       <th className="py-3.5 px-4">Duration</th>
                       <th className="py-3.5 px-4">Status & Type</th>
                       <th className="py-3.5 px-4 text-center">GPS Locations</th>
+                      {canManageAttendance && <th className="py-3.5 px-4 text-right">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredLogs.map((log) => {
                       const isAutoClosed = log.status === 'auto_closed' || log.isAutoClosed;
-                      const isManual = log.attendanceType === 'MANUAL';
+                      const isManual = log.attendanceType === 'MANUAL' || log.isManuallyEdited;
+                      const isAbsent = log.status === 'absent';
+                      const isHalfDay = log.status === 'half_day' || log.payableFraction === 0.5 || isHalfDayCheckIn(log.checkIn);
 
                       return (
                         <tr key={log.id} className="hover:bg-gray-50/60 transition-colors">
@@ -265,9 +358,19 @@ export const AttendancePage: React.FC = () => {
                             <p className="text-[10px] text-brand-600 font-bold uppercase">{log.userDesignation}</p>
                           </td>
                           <td className="py-3.5 px-4 font-mono font-semibold text-gray-700">{log.date}</td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">{log.checkIn}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold">
+                            {isAbsent ? (
+                              <span className="text-red-600">ABSENT</span>
+                            ) : (
+                              <span className="text-emerald-600">{log.checkIn || '—'}</span>
+                            )}
+                          </td>
                           <td className="py-3.5 px-4 font-mono font-bold text-gray-700">
-                            {log.checkOut || <span className="text-amber-600 text-[11px]">Active Shift</span>}
+                            {isAbsent ? (
+                              <span className="text-gray-400">—</span>
+                            ) : (
+                              log.checkOut || <span className="text-amber-600 text-[11px]">Active Shift</span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 font-bold text-gray-800">
                             {log.totalMinutes > 0
@@ -276,32 +379,44 @@ export const AttendancePage: React.FC = () => {
                           </td>
                           <td className="py-3.5 px-4 space-y-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {isAutoClosed ? (
+                              {isAbsent ? (
+                                <Badge variant="danger" size="sm">
+                                  ABSENT
+                                </Badge>
+                              ) : isHalfDay ? (
+                                <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-900 border-amber-300 font-bold">
+                                  HALF DAY (0.5x)
+                                </Badge>
+                              ) : isAutoClosed ? (
                                 <Badge variant="warning" size="sm">
                                   AUTO CLOSED
                                 </Badge>
-                              ) : isManual ? (
-                                <Badge variant="brand" size="sm" className="bg-purple-100 text-purple-800 border-purple-200">
-                                  MANUALLY ADDED
-                                </Badge>
                               ) : (
                                 <Badge variant="success" size="sm">
-                                  COMPLETED
+                                  PRESENT
+                                </Badge>
+                              )}
+
+                              {isManual && (
+                                <Badge variant="brand" size="sm" className="bg-purple-100 text-purple-800 border-purple-200 font-bold">
+                                  ✎ MANUAL
                                 </Badge>
                               )}
                             </div>
-                            {isManual && log.manualReason && (
+                            {log.manualReason && (
                               <p className="text-[10px] text-purple-700 italic">Reason: {log.manualReason}</p>
                             )}
-                            {isManual && log.createdByName && (
-                              <p className="text-[10px] text-gray-400">Added by: {log.createdByName}</p>
+                            {log.editedByName && (
+                              <p className="text-[10px] text-gray-500 font-medium">Edited by: {log.editedByName}</p>
                             )}
-                            {isAutoClosed && (
-                              <p className="text-[10px] text-amber-700 font-medium">Automatic Closed at 9:00 PM</p>
+                            {log.createdByName && !log.editedByName && (
+                              <p className="text-[10px] text-gray-400">Added by: {log.createdByName}</p>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            {isAutoClosed ? (
+                            {isAbsent ? (
+                              <span className="text-[10px] text-gray-400">No Location</span>
+                            ) : isAutoClosed ? (
                               <span className="text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded">
                                 Automatic Closed
                               </span>
@@ -326,6 +441,18 @@ export const AttendancePage: React.FC = () => {
                               </div>
                             )}
                           </td>
+                          {canManageAttendance && (
+                            <td className="py-3.5 px-4 text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                icon={<Edit3 className="w-3.5 h-3.5" />}
+                                onClick={() => handleOpenEditManual(log)}
+                              >
+                                Edit
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -337,14 +464,19 @@ export const AttendancePage: React.FC = () => {
         </div>
       )}
 
-      {/* MANUAL ATTENDANCE MODAL FOR DIRECTOR WITH TIME SELECTORS */}
+      {/* MANUAL ATTENDANCE / EDIT MODAL FOR DIRECTOR WITH TIME & STATUS SELECTORS */}
       {manualModalOpen && (
-        <Modal isOpen={manualModalOpen} onClose={() => setManualModalOpen(false)} title="Add Manual Attendance Record">
-          <form onSubmit={handleCreateManualAttendance} className="space-y-4">
+        <Modal
+          isOpen={manualModalOpen}
+          onClose={() => setManualModalOpen(false)}
+          title={editingRecord ? 'Edit & Correct Attendance Record' : 'Add Manual Attendance Record'}
+        >
+          <form onSubmit={(e) => handleSaveAttendance(e, false)} className="space-y-4">
             <Select
               label="Select Staff Member"
               value={selectedStaffId}
               onChange={(e) => setSelectedStaffId(e.target.value)}
+              disabled={Boolean(editingRecord)}
               options={[
                 { value: '', label: '-- Select Active Staff --' },
                 ...activeStaffList.map((s) => ({
@@ -355,124 +487,158 @@ export const AttendancePage: React.FC = () => {
               required
             />
 
-            <Input
-              label="Attendance Date"
-              type="date"
-              value={manualDate}
-              onChange={(e) => setManualDate(e.target.value)}
-              required
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Attendance Date"
+                type="date"
+                value={manualDate}
+                onChange={(e) => setManualDate(e.target.value)}
+                required
+              />
 
-            {/* TIME SELECTORS SECTION */}
-            <div className="bg-gray-50/80 p-4 rounded-xl border border-gray-200 space-y-4">
-              {/* DUTY ON TIME */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                  Duty On Time <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    aria-label="Duty On Hour"
-                    value={inHour}
-                    onChange={(e) => setInHour(e.target.value)}
-                    className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
-                  >
-                    {HOURS.map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
-
-                  <span className="font-bold text-gray-400 text-sm select-none">:</span>
-
-                  <select
-                    aria-label="Duty On Minute"
-                    value={inMinute}
-                    onChange={(e) => setInMinute(e.target.value)}
-                    className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
-                  >
-                    {MINUTES.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    aria-label="Duty On AM/PM"
-                    value={inPeriod}
-                    onChange={(e) => setInPeriod(e.target.value as 'AM' | 'PM')}
-                    className="w-20 h-9 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-2 text-xs font-black focus:outline-none focus:border-brand-500 shadow-sm"
-                  >
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* DUTY OFF TIME */}
-              <div className="space-y-1 pt-3 border-t border-gray-200/80">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                  Duty Off Time <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    aria-label="Duty Off Hour"
-                    value={outHour}
-                    onChange={(e) => setOutHour(e.target.value)}
-                    className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
-                  >
-                    {HOURS.map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
-
-                  <span className="font-bold text-gray-400 text-sm select-none">:</span>
-
-                  <select
-                    aria-label="Duty Off Minute"
-                    value={outMinute}
-                    onChange={(e) => setOutMinute(e.target.value)}
-                    className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
-                  >
-                    {MINUTES.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    aria-label="Duty Off AM/PM"
-                    value={outPeriod}
-                    onChange={(e) => setOutPeriod(e.target.value as 'AM' | 'PM')}
-                    className="w-20 h-9 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-2 text-xs font-black focus:outline-none focus:border-brand-500 shadow-sm"
-                  >
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                  </select>
-                </div>
-              </div>
+              <Select
+                label="Attendance Status"
+                value={attendanceStatus}
+                onChange={(e) => setAttendanceStatus(e.target.value as 'present' | 'half_day' | 'absent')}
+                options={[
+                  { value: 'present', label: 'Present (Full Day)' },
+                  { value: 'half_day', label: 'Half Day (50% Pay)' },
+                  { value: 'absent', label: 'Absent (0 Pay / Deduction)' },
+                ]}
+              />
             </div>
 
-            <Input
-              label="Workplace / Office Location"
-              placeholder="e.g. Head Office, Patna"
-              value={locationText}
-              onChange={(e) => setLocationText(e.target.value)}
-            />
+            {/* REALTIME 2:00 PM HALF DAY WARNING */}
+            {attendanceStatus !== 'absent' && isHalfDayCheckIn(`${inHour}:${inMinute} ${inPeriod}`) && (
+              <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl flex items-start gap-2 text-amber-900 text-xs">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-extrabold uppercase tracking-wide">⚠ HALF DAY RULE APPLIED</p>
+                  <p className="font-medium mt-0.5">
+                    Check-in time ({inHour}:{inMinute} {inPeriod}) is after 2:00 PM. Attendance will automatically save as <strong>HALF DAY</strong> (50% Daily Salary).
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* TIME SELECTORS SECTION */}
+            {attendanceStatus !== 'absent' ? (
+              <div className="bg-gray-50/80 p-4 rounded-xl border border-gray-200 space-y-4">
+                {/* DUTY ON TIME */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Duty On Time <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      aria-label="Duty On Hour"
+                      value={inHour}
+                      onChange={(e) => setInHour(e.target.value)}
+                      className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
+                    >
+                      {HOURS.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+
+                    <span className="font-bold text-gray-400 text-sm select-none">:</span>
+
+                    <select
+                      aria-label="Duty On Minute"
+                      value={inMinute}
+                      onChange={(e) => setInMinute(e.target.value)}
+                      className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
+                    >
+                      {MINUTES.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      aria-label="Duty On AM/PM"
+                      value={inPeriod}
+                      onChange={(e) => setInPeriod(e.target.value as 'AM' | 'PM')}
+                      className="w-20 h-9 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-2 text-xs font-black focus:outline-none focus:border-brand-500 shadow-sm"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* DUTY OFF TIME */}
+                <div className="space-y-1 pt-3 border-t border-gray-200/80">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Duty Off Time <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      aria-label="Duty Off Hour"
+                      value={outHour}
+                      onChange={(e) => setOutHour(e.target.value)}
+                      className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
+                    >
+                      {HOURS.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+
+                    <span className="font-bold text-gray-400 text-sm select-none">:</span>
+
+                    <select
+                      aria-label="Duty Off Minute"
+                      value={outMinute}
+                      onChange={(e) => setOutMinute(e.target.value)}
+                      className="w-16 h-9 bg-white border border-gray-300 rounded-lg px-2 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 shadow-sm"
+                    >
+                      {MINUTES.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      aria-label="Duty Off AM/PM"
+                      value={outPeriod}
+                      onChange={(e) => setOutPeriod(e.target.value as 'AM' | 'PM')}
+                      className="w-20 h-9 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-2 text-xs font-black focus:outline-none focus:border-brand-500 shadow-sm"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-red-50 p-3 rounded-xl border border-red-200 text-red-900 text-xs font-medium">
+                Note: <strong>ABSENT</strong> selected. Duty On/Off timestamps and workplace location will be cleared for this date.
+              </div>
+            )}
+
+            {attendanceStatus !== 'absent' && (
+              <Input
+                label="Workplace / Office Location"
+                placeholder="e.g. Head Office, Patna"
+                value={locationText}
+                onChange={(e) => setLocationText(e.target.value)}
+              />
+            )}
 
             <div className="space-y-1">
               <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
-                Reason for Manual Entry <span className="text-red-500">*</span>
+                Reason for Manual Entry / Edit <span className="text-red-500">*</span>
               </label>
               <textarea
                 className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 rows={3}
-                placeholder="Specify reason for manual override e.g. Phone battery died or field assignment..."
+                placeholder="Specify reason for manual entry or correction (e.g. Date correction, late check-in, marked absent)..."
                 value={manualReason}
                 onChange={(e) => setManualReason(e.target.value)}
                 required
@@ -480,7 +646,7 @@ export const AttendancePage: React.FC = () => {
             </div>
 
             <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-              Note: Manual attendance requires Director PIN authorization and will be audited with mandatory badges.
+              Note: Attendance modification requires Director PIN authorization and will automatically recalculate staff salary slips.
             </p>
 
             <div className="flex gap-2 pt-2">
@@ -488,10 +654,52 @@ export const AttendancePage: React.FC = () => {
                 Cancel
               </Button>
               <Button type="submit" variant="primary" className="w-full" loading={submittingManual}>
-                Save Manual Attendance (PIN)
+                {editingRecord ? 'Update Attendance (PIN)' : 'Save Attendance (PIN)'}
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* DUPLICATE DATE CONFLICT CONFIRMATION MODAL */}
+      {duplicateConflictOpen && (
+        <Modal
+          isOpen={duplicateConflictOpen}
+          onClose={() => setDuplicateConflictOpen(false)}
+          title="Attendance Already Exists"
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs text-amber-950">
+                <p className="font-extrabold text-sm">Attendance already exists for this date!</p>
+                <p>
+                  An attendance record already exists for this staff member on <strong>{manualDate}</strong>.
+                </p>
+                <p className="font-semibold text-amber-900 mt-1">
+                  Do you want to replace/merge the existing record on {manualDate}?
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setDuplicateConflictOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                onClick={() => handleSaveAttendance(undefined, true)}
+                loading={submittingManual}
+              >
+                Confirm Replace Record (PIN)
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, Ale
 import { useRealtimeCollection } from '../../../hooks/useRealtime';
 import { AttendanceRecord, CompanyHoliday, StaffProfile } from '../../../types';
 import { getCurrentDateISO, formatMonthYear } from '../../../utils/dateUtils';
-import { calculateSalaryBreakdown } from '../../../services/salaryCalculator';
+import { calculateSalaryBreakdown, getAttendanceStatusAndFraction } from '../../../services/salaryCalculator';
 import { where } from 'firebase/firestore';
 
 interface StaffAttendanceCalendarProps {
@@ -130,22 +130,20 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
     const attendance = attendanceMap.get(dateStr);
     const isFuture = dateStr > todayISO;
 
-    const isWorked = attendance && (
-      attendance.status === 'present' ||
-      attendance.status === 'on_duty' ||
-      attendance.status === 'completed' ||
-      attendance.status === 'auto_closed' ||
-      attendance.isAutoClosed === true ||
-      attendance.attendanceType === 'MANUAL' ||
-      Boolean(attendance.checkIn)
-    );
+    const { status: attStatus, fraction } = getAttendanceStatusAndFraction(attendance);
 
-    let status: 'present' | 'absent' | 'sunday' | 'holiday' | 'manual' | 'future' = 'absent';
+    let status: 'present' | 'half_day' | 'absent' | 'sunday' | 'holiday' | 'future' = 'absent';
 
     if (isFuture) {
       status = 'future';
-    } else if (isWorked) {
-      status = attendance.attendanceType === 'MANUAL' ? 'manual' : 'present';
+    } else if (attendance) {
+      if (attStatus === 'ABSENT' || attendance.status === 'absent') {
+        status = 'absent';
+      } else if (attStatus === 'HALF_DAY' || fraction === 0.5) {
+        status = 'half_day';
+      } else {
+        status = 'present';
+      }
     } else if (isSunday) {
       status = 'sunday';
     } else if (isHoliday) {
@@ -296,16 +294,16 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
               let statusLabel = 'Future';
 
               if (status === 'present') {
-                bgClasses = 'bg-emerald-50/80 hover:bg-emerald-100/80 border-emerald-300 text-emerald-950';
+                bgClasses = 'bg-emerald-50/90 hover:bg-emerald-100 border-emerald-300 text-emerald-950';
                 badgeColor = 'bg-emerald-600 text-white';
                 statusLabel = 'Present';
-              } else if (status === 'manual') {
-                bgClasses = 'bg-purple-50/80 hover:bg-purple-100/80 border-purple-300 text-purple-950';
-                badgeColor = 'bg-purple-600 text-white';
-                statusLabel = 'Manual';
+              } else if (status === 'half_day') {
+                bgClasses = 'bg-amber-100/90 hover:bg-amber-200/90 border-amber-400 text-amber-950';
+                badgeColor = 'bg-amber-600 text-white';
+                statusLabel = 'Half Day';
               } else if (status === 'sunday' || status === 'holiday') {
-                bgClasses = 'bg-amber-50/80 hover:bg-amber-100/80 border-amber-300 text-amber-950';
-                badgeColor = 'bg-amber-500 text-white';
+                bgClasses = 'bg-yellow-50/80 hover:bg-yellow-100/80 border-yellow-300 text-yellow-950';
+                badgeColor = 'bg-yellow-600 text-white';
                 statusLabel = isHoliday ? 'Holiday' : 'Sunday';
               } else if (status === 'absent') {
                 bgClasses = 'bg-red-50/80 hover:bg-red-100/80 border-red-300 text-red-950';
@@ -317,6 +315,8 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                 statusLabel = '—';
               }
 
+              const isManualOrEdited = attendance && (attendance.attendanceType === 'MANUAL' || attendance.isManuallyEdited);
+
               return (
                 <button
                   key={cell.dateStr}
@@ -324,7 +324,14 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                   className={`h-16 sm:h-20 p-1.5 sm:p-2 rounded-xl border text-left flex flex-col justify-between transition-all hover:shadow-md active:scale-95 relative overflow-hidden ${bgClasses}`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-xs sm:text-sm font-black font-mono">{dayNum}</span>
+                    <span className="text-xs sm:text-sm font-black font-mono flex items-center gap-1">
+                      {dayNum}
+                      {isManualOrEdited && (
+                        <span className="text-[9px] text-purple-700 font-bold bg-purple-100 px-1 rounded" title="Manual/Edited Entry">
+                          ✎
+                        </span>
+                      )}
+                    </span>
                     <span className={`text-[9px] sm:text-[10px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-tight ${badgeColor}`}>
                       {statusLabel}
                     </span>
@@ -332,9 +339,13 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
 
                   <div className="truncate text-[10px] font-semibold">
                     {attendance ? (
-                      <span className="font-mono text-emerald-800 block truncate font-bold">
-                        {attendance.checkIn}
-                      </span>
+                      status === 'absent' ? (
+                        <span className="text-red-700 block font-bold">Absent</span>
+                      ) : (
+                        <span className="font-mono text-emerald-900 block truncate font-bold">
+                          {attendance.checkIn || 'Checked In'}
+                        </span>
+                      )
                     ) : isHoliday ? (
                       <span className="text-amber-800 block truncate">{cell.holidayTitle}</span>
                     ) : isSunday ? (
@@ -355,21 +366,25 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
         <div className="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-gray-600">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm" />
-            <span>🟢 Present</span>
+            <span>🟢 Present (Full Day)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm" />
+            <span>🟧 Half Day (After 2:00 PM)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-red-500 shadow-sm" />
             <span>🔴 Absent</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm" />
+            <span className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm" />
             <span>🟡 Sunday / Company Holiday</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-purple-600 shadow-sm" />
-            <span>🔵 Manual Attendance</span>
+            <span className="px-1 py-0.2 bg-purple-100 text-purple-700 rounded text-[10px] font-black">✎</span>
+            <span>Manual / Edited Entry</span>
           </div>
-          <div className="flex items-center gap-1.5">
+        </div>
             <span className="w-3 h-3 rounded-full bg-gray-300 shadow-sm" />
             <span>⚪ Future Date</span>
           </div>

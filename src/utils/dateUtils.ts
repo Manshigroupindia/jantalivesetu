@@ -49,3 +49,36 @@ export function getGreeting(): string {
   if (hour < 17) return 'Good Afternoon';
   return 'Good Evening';
 }
+
+/**
+ * Parses time string (e.g. '09:30 AM', '02:01 PM', '14:01') into minutes from midnight.
+ */
+export function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const str = timeStr.trim().toUpperCase();
+  const isPM = str.includes('PM');
+  const isAM = str.includes('AM');
+  const clean = str.replace(/(AM|PM)/g, '').trim();
+  const parts = clean.split(':').map((p) => parseInt(p.trim(), 10));
+
+  let hours = parts[0] || 0;
+  const minutes = parts[1] || 0;
+
+  if (isPM && hours < 12) {
+    hours += 12;
+  } else if (isAM && hours === 12) {
+    hours = 0;
+  }
+
+  return hours * 60 + minutes;
+}
+
+/**
+ * Business Rule: Check-in after 2:00 PM (14:00 / 840 mins) is HALF DAY.
+ * Exactly 2:00 PM (840 mins) is FULL DAY. 2:01 PM (841 mins) is HALF DAY.
+ */
+export function isHalfDayCheckIn(checkInTimeStr?: string): boolean {
+  if (!checkInTimeStr) return false;
+  const minutes = parseTimeToMinutes(checkInTimeStr);
+  return minutes > 840; // > 14:00 (840 minutes)
+}

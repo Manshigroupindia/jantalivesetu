@@ -468,6 +468,8 @@ export async function createManualAttendance(data: {
   manualReason: string;
   createdById: string;
   createdByName: string;
+  status?: 'present' | 'absent' | 'half_day';
+  replaceExistingIfDuplicate?: boolean;
 }): Promise<string> {
   // Check duplicate attendance for date
   const q = query(
@@ -477,26 +479,26 @@ export async function createManualAttendance(data: {
   );
   const snap = await getDocs(q);
   if (!snap.empty) {
-    throw new Error('Attendance already exists for this date.');
+    if (!data.replaceExistingIfDuplicate) {
+      throw new Error('DUPLICATE_DATE_CONFLICT');
+    }
+    // Delete existing records on duplicate date if replace is confirmed
+    for (const d of snap.docs) {
+      await deleteDoc(d.ref).catch(() => {});
+    }
   }
 
   let totalMinutes = 480;
-  try {
-    const parseTime = (tStr: string) => {
-      const match = tStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return 0;
-      let h = parseInt(match[1], 10);
-      const m = parseInt(match[2], 10);
-      const ampm = match[3].toUpperCase();
-      if (ampm === 'PM' && h < 12) h += 12;
-      if (ampm === 'AM' && h === 12) h = 0;
-      return h * 60 + m;
-    };
-    const startM = parseTime(data.checkIn);
-    const endM = parseTime(data.checkOut);
-    if (endM > startM) totalMinutes = endM - startM;
-  } catch (e) {
-    // fallback
+  if (data.status === 'absent') {
+    totalMinutes = 0;
+  } else if (data.checkIn && data.checkOut) {
+    try {
+      const startM = parseTimeToMinutes(data.checkIn);
+      const endM = parseTimeToMinutes(data.checkOut);
+      if (endM > startM) totalMinutes = endM - startM;
+    } catch (e) {
+      // fallback
+    }
   }
 
   const locationObj = {
@@ -506,18 +508,34 @@ export async function createManualAttendance(data: {
     capturedAt: new Date().toISOString(),
   };
 
+  let finalStatus: 'present' | 'half_day' | 'absent' = data.status || 'present';
+  let payableFraction = 1;
+
+  if (data.status === 'absent') {
+    finalStatus = 'absent';
+    payableFraction = 0;
+  } else if (data.status === 'half_day' || (data.checkIn && isHalfDayCheckIn(data.checkIn))) {
+    finalStatus = 'half_day';
+    payableFraction = 0.5;
+  } else {
+    finalStatus = 'present';
+    payableFraction = 1;
+  }
+
   const newDoc: Omit<AttendanceRecord, 'id'> = {
     userId: data.userId,
     userName: data.userName,
     userDesignation: data.userDesignation,
     date: data.date,
-    checkIn: data.checkIn,
-    checkOut: data.checkOut,
+    checkIn: finalStatus === 'absent' ? '' : data.checkIn,
+    checkOut: finalStatus === 'absent' ? '' : data.checkOut,
     checkInLocation: locationObj,
     checkOutLocation: locationObj,
     totalMinutes,
-    status: 'completed',
+    status: finalStatus as any,
+    payableFraction,
     attendanceType: 'MANUAL',
+    isManuallyEdited: true,
     manualReason: data.manualReason,
     createdById: data.createdById,
     createdByName: data.createdByName,
@@ -527,6 +545,104 @@ export async function createManualAttendance(data: {
 
   const docRef = await addDoc(collection(db, 'attendance'), newDoc);
   return docRef.id;
+}
+
+export async function updateManualAttendance(
+  attendanceId: string,
+  data: {
+    userId: string;
+    userName?: string;
+    userDesignation?: string;
+    date: string;
+    status: 'present' | 'absent' | 'half_day';
+    checkIn?: string;
+    checkOut?: string;
+    locationText?: string;
+    manualReason?: string;
+    editedById: string;
+    editedByName: string;
+    replaceExistingIfDuplicate?: boolean;
+  }
+): Promise<void> {
+  const currentDocRef = doc(db, 'attendance', attendanceId);
+  const currentSnap = await getDoc(currentDocRef);
+
+  if (!currentSnap.exists()) {
+    throw new Error('Attendance record not found.');
+  }
+
+  const existingData = currentSnap.data() as AttendanceRecord;
+  const previousDate = existingData.date;
+  const previousCheckIn = existingData.checkIn;
+  const previousStatus = existingData.status;
+
+  // Check duplicate date conflict if changing date
+  if (data.date !== previousDate) {
+    const q = query(
+      collection(db, 'attendance'),
+      where('userId', '==', data.userId),
+      where('date', '==', data.date)
+    );
+    const snap = await getDocs(q);
+
+    const otherDocs = snap.docs.filter((d) => d.id !== attendanceId);
+    if (otherDocs.length > 0) {
+      if (!data.replaceExistingIfDuplicate) {
+        throw new Error('DUPLICATE_DATE_CONFLICT');
+      }
+      for (const d of otherDocs) {
+        await deleteDoc(d.ref).catch(() => {});
+      }
+    }
+  }
+
+  let totalMinutes = existingData.totalMinutes || 480;
+  if (data.status === 'absent') {
+    totalMinutes = 0;
+  } else if (data.checkIn && data.checkOut) {
+    try {
+      const startM = parseTimeToMinutes(data.checkIn);
+      const endM = parseTimeToMinutes(data.checkOut);
+      if (endM > startM) totalMinutes = endM - startM;
+    } catch (e) {
+      // fallback
+    }
+  }
+
+  let finalStatus: 'present' | 'half_day' | 'absent' = data.status;
+  let payableFraction = 1;
+
+  if (data.status === 'absent') {
+    finalStatus = 'absent';
+    payableFraction = 0;
+  } else if (data.status === 'half_day' || (data.checkIn && isHalfDayCheckIn(data.checkIn))) {
+    finalStatus = 'half_day';
+    payableFraction = 0.5;
+  } else {
+    finalStatus = 'present';
+    payableFraction = 1;
+  }
+
+  const updateFields: Partial<AttendanceRecord> = {
+    date: data.date,
+    status: finalStatus as any,
+    payableFraction,
+    checkIn: data.status === 'absent' ? '' : data.checkIn || existingData.checkIn || '09:00 AM',
+    checkOut: data.status === 'absent' ? '' : data.checkOut || existingData.checkOut || '06:00 PM',
+    totalMinutes,
+    attendanceType: 'MANUAL',
+    isManuallyEdited: true,
+    editedBy: data.editedById,
+    editedByName: data.editedByName,
+    editedAt: new Date().toISOString(),
+    editReason: data.manualReason || existingData.manualReason || 'Director Attendance Edit',
+    previousDate: data.date !== previousDate ? previousDate : existingData.previousDate,
+    previousCheckIn: data.checkIn !== previousCheckIn ? previousCheckIn : existingData.previousCheckIn,
+    previousStatus: data.status !== previousStatus ? previousStatus : existingData.previousStatus,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await updateDoc(currentDocRef, updateFields);
 }
 
 export async function autoCloseStaleAttendance(records: AttendanceRecord[]): Promise<void> {

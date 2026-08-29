@@ -113,6 +113,15 @@ export interface AttendanceRecord {
   manualReason?: string;
   createdById?: string;
   createdByName?: string;
+  payableFraction?: number; // 1 = Full Day, 0.5 = Half Day, 0 = Absent
+  isManuallyEdited?: boolean;
+  editedBy?: string;
+  editedByName?: string;
+  editedAt?: string;
+  editReason?: string;
+  previousDate?: string;
+  previousCheckIn?: string;
+  previousStatus?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -342,6 +351,10 @@ export interface SalaryCalculationResult {
   baseSalary?: number;
   totalDaysInMonth?: number;
   presentDays?: number;
+  fullDaysCount?: number;
+  fullDayPayAmount?: number;
+  halfDaysCount?: number;
+  halfDayPayAmount?: number;
   sundaysCount?: number;
   paidHolidaysCount?: number;
   emergencyLeaveCount?: number;
