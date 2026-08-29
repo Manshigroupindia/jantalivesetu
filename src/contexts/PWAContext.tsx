@@ -9,14 +9,22 @@ export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean;
+}
+
+interface WindowWithMSStream extends Window {
+  MSStream?: unknown;
+}
+
 interface PWAContextType {
   deferredPrompt: BeforeInstallPromptEvent | null;
   isStandalone: boolean;
   isIOS: boolean;
   isMobile: boolean;
-  installModalOpen: boolean;
-  openInstallModal: () => void;
-  closeInstallModal: () => void;
+  installMessage: string | null;
+  clearInstallMessage: () => void;
+  installApp: () => Promise<void>;
   triggerInstall: () => Promise<void>;
 }
 
@@ -25,9 +33,9 @@ const PWAContext = createContext<PWAContextType>({
   isStandalone: false,
   isIOS: false,
   isMobile: false,
-  installModalOpen: false,
-  openInstallModal: () => {},
-  closeInstallModal: () => {},
+  installMessage: null,
+  clearInstallMessage: () => {},
+  installApp: async () => {},
   triggerInstall: async () => {},
 });
 
@@ -36,33 +44,43 @@ export const PWAProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [installModalOpen, setInstallModalOpen] = useState<boolean>(false);
+  const [installMessage, setInstallMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('[PWA] Provider initialized');
+
     const checkStandalone = (): boolean => {
       const isStandaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
-      const isNavStandalone = (navigator as any).standalone === true;
+      const nav = window.navigator as NavigatorWithStandalone;
+      const isNavStandalone = nav.standalone === true;
       return isStandaloneMatch || isNavStandalone;
     };
 
-    setIsStandalone(checkStandalone());
+    const standaloneState = checkStandalone();
+    setIsStandalone(standaloneState);
+
+    if (standaloneState) {
+      console.log('[PWA] Running in standalone mode');
+    }
 
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const iosDevice = /iphone|ipad|ipod/.test(userAgent) && !(window as any).MSStream;
+    const win = window as WindowWithMSStream;
+    const iosDevice = /iphone|ipad|ipod/.test(userAgent) && !win.MSStream;
     setIsIOS(iosDevice);
     setIsMobile(window.innerWidth <= 768 || /mobile|android|touch/.test(userAgent));
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      console.log('[PWA] beforeinstallprompt event captured in PWAProvider.');
+      console.log('[PWA] beforeinstallprompt fired');
+      console.log('[PWA] deferredPrompt stored');
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
     const handleAppInstalled = () => {
-      console.log('[PWA] appinstalled event captured in PWAProvider.');
+      console.log('[PWA] appinstalled fired');
       setDeferredPrompt(null);
       setIsStandalone(true);
-      setInstallModalOpen(false);
+      setInstallMessage(null);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -74,28 +92,36 @@ export const PWAProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  const openInstallModal = () => setInstallModalOpen(true);
-  const closeInstallModal = () => setInstallModalOpen(false);
+  const clearInstallMessage = () => setInstallMessage(null);
 
-  const triggerInstall = async () => {
+  const installApp = async () => {
+    console.log('[PWA] Install button clicked');
+
     if (deferredPrompt) {
       try {
-        console.log('[PWA] Triggering native prompt via triggerInstall...');
+        console.log('[PWA] Native install prompt requested');
         await deferredPrompt.prompt();
         const choiceResult = await deferredPrompt.userChoice;
-        console.log(`[PWA] Choice outcome: ${choiceResult.outcome}`);
+        console.log(`[PWA] User choice: ${choiceResult.outcome}`);
+
         if (choiceResult.outcome === 'accepted') {
+          console.log('[PWA] Native installation accepted by user');
           setDeferredPrompt(null);
           setIsStandalone(true);
+        } else {
+          console.log('[PWA] Native installation dismissed by user');
         }
       } catch (err) {
-        console.error('[PWA] Error triggering native install prompt:', err);
-      } finally {
-        setInstallModalOpen(false);
+        console.error('[PWA] Error executing native install prompt:', err);
       }
     } else {
-      // If native prompt not available yet, open platform instruction modal
-      setInstallModalOpen(true);
+      console.log('[PWA] Native prompt not available (deferredPrompt is null)');
+      setInstallMessage(
+        'PWA installation is currently unavailable in this browser or app is already installed.'
+      );
+      setTimeout(() => {
+        setInstallMessage(null);
+      }, 6000);
     }
   };
 
@@ -106,10 +132,10 @@ export const PWAProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isStandalone,
         isIOS,
         isMobile,
-        installModalOpen,
-        openInstallModal,
-        closeInstallModal,
-        triggerInstall,
+        installMessage,
+        clearInstallMessage,
+        installApp,
+        triggerInstall: installApp,
       }}
     >
       {children}
