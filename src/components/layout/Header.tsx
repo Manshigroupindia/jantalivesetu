@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
-  const { staffProfile } = useAuth();
+  const { userDoc, staffProfile } = useAuth();
   const { lockPinSession } = useSecurity();
   const { isStandalone, triggerInstall } = usePWA();
   const [timeStr, setTimeStr] = useState(getCurrentTimeFormatted());
