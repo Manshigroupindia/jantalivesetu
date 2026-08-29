@@ -31,7 +31,8 @@ import {
   SalaryRecord,
   Notice,
   CompanyHoliday,
-  ClientRecord
+  ClientRecord,
+  LocationRecord
 } from '../types';
 import { getNextUniqueStaffId } from '../utils/idGenerator';
 import { parseTimeToMinutes, isHalfDayCheckIn } from '../utils/dateUtils';
@@ -633,7 +634,6 @@ export async function updateManualAttendance(
     totalMinutes,
     attendanceType: existingData.attendanceType || 'REGULAR',
     isManuallyEdited: true,
-    isEdited: true,
     isAutoClosed: false,
     editedBy: data.editedById,
     editedByName: data.editedByName,
