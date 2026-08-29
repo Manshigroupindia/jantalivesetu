@@ -364,19 +364,19 @@ export const AttendancePage: React.FC = () => {
               required
             />
 
-            {/* TIME SELECTORS (HOUR, MINUTE, AM/PM) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-200">
-              {/* DUTY ON TIME SELECTOR */}
-              <div className="space-y-1.5 bg-white p-3 rounded-xl border border-gray-200/80 shadow-xs">
-                <label className="block text-xs font-extrabold uppercase tracking-wider text-gray-700">
+            {/* TIME SELECTORS SECTION */}
+            <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* DUTY ON TIME */}
+              <div className="space-y-1 min-w-0">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
                   Duty On Time <span className="text-red-500">*</span>
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
                   <select
                     aria-label="Duty On Hour"
                     value={inHour}
                     onChange={(e) => setInHour(e.target.value)}
-                    className="w-16 h-9 shrink-0 bg-gray-50 border border-gray-300 rounded-lg px-2 text-xs font-black font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    className="w-[58px] sm:w-[64px] h-9 shrink-0 bg-white border border-gray-300 rounded-lg px-1.5 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 box-border"
                   >
                     {HOURS.map((h) => (
                       <option key={h} value={h}>
@@ -385,13 +385,13 @@ export const AttendancePage: React.FC = () => {
                     ))}
                   </select>
 
-                  <span className="font-extrabold text-gray-400 text-sm select-none shrink-0">:</span>
+                  <span className="font-bold text-gray-400 text-xs shrink-0 select-none">:</span>
 
                   <select
                     aria-label="Duty On Minute"
                     value={inMinute}
                     onChange={(e) => setInMinute(e.target.value)}
-                    className="w-16 h-9 shrink-0 bg-gray-50 border border-gray-300 rounded-lg px-2 text-xs font-black font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    className="w-[58px] sm:w-[64px] h-9 shrink-0 bg-white border border-gray-300 rounded-lg px-1.5 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 box-border"
                   >
                     {MINUTES.map((m) => (
                       <option key={m} value={m}>
@@ -404,7 +404,7 @@ export const AttendancePage: React.FC = () => {
                     aria-label="Duty On AM/PM"
                     value={inPeriod}
                     onChange={(e) => setInPeriod(e.target.value as 'AM' | 'PM')}
-                    className="w-20 h-9 shrink-0 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    className="w-[64px] sm:w-[68px] h-9 shrink-0 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-1 text-xs font-extrabold focus:outline-none focus:border-brand-500 box-border"
                   >
                     <option value="AM">AM</option>
                     <option value="PM">PM</option>
@@ -412,17 +412,17 @@ export const AttendancePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* DUTY OFF TIME SELECTOR */}
-              <div className="space-y-1.5 bg-white p-3 rounded-xl border border-gray-200/80 shadow-xs">
-                <label className="block text-xs font-extrabold uppercase tracking-wider text-gray-700">
+              {/* DUTY OFF TIME */}
+              <div className="space-y-1 min-w-0">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
                   Duty Off Time <span className="text-red-500">*</span>
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
                   <select
                     aria-label="Duty Off Hour"
                     value={outHour}
                     onChange={(e) => setOutHour(e.target.value)}
-                    className="w-16 h-9 shrink-0 bg-gray-50 border border-gray-300 rounded-lg px-2 text-xs font-black font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    className="w-[58px] sm:w-[64px] h-9 shrink-0 bg-white border border-gray-300 rounded-lg px-1.5 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 box-border"
                   >
                     {HOURS.map((h) => (
                       <option key={h} value={h}>
@@ -431,13 +431,13 @@ export const AttendancePage: React.FC = () => {
                     ))}
                   </select>
 
-                  <span className="font-extrabold text-gray-400 text-sm select-none shrink-0">:</span>
+                  <span className="font-bold text-gray-400 text-xs shrink-0 select-none">:</span>
 
                   <select
                     aria-label="Duty Off Minute"
                     value={outMinute}
                     onChange={(e) => setOutMinute(e.target.value)}
-                    className="w-16 h-9 shrink-0 bg-gray-50 border border-gray-300 rounded-lg px-2 text-xs font-black font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    className="w-[58px] sm:w-[64px] h-9 shrink-0 bg-white border border-gray-300 rounded-lg px-1.5 text-xs font-mono font-bold text-gray-900 focus:outline-none focus:border-brand-500 box-border"
                   >
                     {MINUTES.map((m) => (
                       <option key={m} value={m}>
@@ -450,7 +450,7 @@ export const AttendancePage: React.FC = () => {
                     aria-label="Duty Off AM/PM"
                     value={outPeriod}
                     onChange={(e) => setOutPeriod(e.target.value as 'AM' | 'PM')}
-                    className="w-20 h-9 shrink-0 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    className="w-[64px] sm:w-[68px] h-9 shrink-0 bg-brand-50 text-brand-800 border border-brand-200 rounded-lg px-1 text-xs font-extrabold focus:outline-none focus:border-brand-500 box-border"
                   >
                     <option value="AM">AM</option>
                     <option value="PM">PM</option>
