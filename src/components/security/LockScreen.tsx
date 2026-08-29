@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Lock, AlertCircle, CheckCircle2, LogOut, ShieldAlert } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle2, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { verifyUserPin, signOutUser } from '../../services/authService';
-import { Button } from '../ui/Button';
 
 export const LockScreen: React.FC = () => {
   const { userDoc, firebaseUser } = useAuth();
