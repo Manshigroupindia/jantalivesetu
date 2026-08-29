@@ -65,7 +65,11 @@ service cloud.firestore {
     // ATTENDANCE
     match /attendance/{attendanceId} {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid && (!('attendanceType' in request.resource.data) || request.resource.data.attendanceType != 'MANUAL')) ||
+        isDirector() ||
+        isAdmin()
+      );
       allow update: if isDirector() || isAdmin() || (
         isAuthenticated() && 
         resource.data.userId == request.auth.uid && 

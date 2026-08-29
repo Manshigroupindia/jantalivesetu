@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -6,19 +7,20 @@ import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { FileUploader } from '../../components/common/FileUploader';
-import { Receipt, Plus, Search, FileText } from 'lucide-react';
+import { Receipt, Plus, Search, FileText, ArrowRight, User, Users, Calendar } from 'lucide-react';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
-import { ExpenseItem } from '../../types';
+import { ExpenseItem, StaffProfile } from '../../types';
 import { createExpenseItem, updateExpenseStatus } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
-import { getCurrentDateISO } from '../../utils/dateUtils';
+import { getCurrentDateISO, getCurrentMonthKey } from '../../utils/dateUtils';
 import { where } from 'firebase/firestore';
 
 export const ExpensesPage: React.FC = () => {
+  const navigate = useNavigate();
   const { userDoc, staffProfile } = useAuth();
   const { isDirector } = usePermissions();
   const { requirePinVerification } = useSecurity();
@@ -28,6 +30,7 @@ export const ExpensesPage: React.FC = () => {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseItem | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthKey()); // YYYY-MM
 
   // Form State
   const [title, setTitle] = useState('');
@@ -39,16 +42,43 @@ export const ExpensesPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const constraints = isDirector
+  // Firestore Expense Query Constraint
+  const expenseConstraints = isDirector
     ? []
     : [where('userId', '==', userDoc?.uid || 'none')];
 
-  const { data: rawExpenses, loading } = useRealtimeCollection<ExpenseItem>('expenses', constraints);
+  const { data: rawExpenses, loading: loadingExpenses } = useRealtimeCollection<ExpenseItem>('expenses', expenseConstraints);
+  const { data: staffProfiles, loading: loadingStaff } = useRealtimeCollection<StaffProfile>('staffProfiles');
 
-  // In-memory sort to avoid requiring composite indexes in Firestore
-  const expenses = [...rawExpenses].sort((a, b) =>
-    (b.createdAt || '').localeCompare(a.createdAt || '')
-  );
+  // Filter active staff (excluding soft-deleted staff)
+  const activeStaffList = staffProfiles.filter((s) => s.approvalStatus !== 'deleted' && s.status !== 'deleted');
+
+  // Sorted Expenses
+  const expenses = [...rawExpenses].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  // Month-filtered Expenses
+  const monthlyExpenses = expenses.filter((e) => e.date && e.date.startsWith(selectedMonth));
+
+  // Overall Totals for Selected Month
+  const overallMonthlyTotal = monthlyExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const overallPaidTotal = monthlyExpenses.filter((e) => e.status === 'paid').reduce((sum, e) => sum + (e.amount || 0), 0);
+  const overallPendingTotal = monthlyExpenses.filter((e) => e.status === 'pending' || e.status === 'approved').reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  // Staff Personal Totals for Selected Month (if normal staff)
+  const myMonthlyExpenses = monthlyExpenses.filter((e) => e.userId === userDoc?.uid);
+  const myMonthlyTotal = myMonthlyExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const myPaidTotal = myMonthlyExpenses.filter((e) => e.status === 'paid').reduce((sum, e) => sum + (e.amount || 0), 0);
+  const myPendingTotal = myMonthlyExpenses.filter((e) => e.status === 'pending' || e.status === 'approved').reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  // Month selector options
+  const monthOptions = Array.from({ length: 12 }).map((_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    return { value: `${yyyy}-${mm}`, label };
+  });
 
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +116,7 @@ export const ExpensesPage: React.FC = () => {
       showToast('Expense reimbursement claim submitted successfully.', 'success');
     } catch (err: any) {
       console.error('Expense submission error:', err);
-      setError('Failed to submit expense claim. Secure with Janta Live Setu.');
+      setError('Failed to submit expense claim.');
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +168,7 @@ export const ExpensesPage: React.FC = () => {
     });
   };
 
-  const filteredExpenses = expenses.filter((e) => {
+  const filteredExpenses = monthlyExpenses.filter((e) => {
     const matchesSearch =
       e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,97 +184,235 @@ export const ExpensesPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             <Receipt className="w-7 h-7 text-brand-600" />
-            Expense Reimbursements
+            {isDirector ? 'Company Expense Management' : 'My Expense Reimbursements'}
           </h1>
           <p className="text-xs text-gray-500 font-medium">
-            Claim, review, and approve staff field & operational expense reimbursements.
+            {isDirector
+              ? 'Real-time staff expense tracking, staff-wise breakdown, and reimbursement approvals.'
+              : 'Submit and track field reporting and operational expense claims.'}
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          icon={<Plus className="w-4 h-4" />}
-          onClick={() => setCreateModalOpen(true)}
-        >
-          Claim New Expense
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-48">
+            <Select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              options={monthOptions}
+            />
+          </div>
+          <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => setCreateModalOpen(true)}>
+            Claim New Expense
+          </Button>
+        </div>
       </div>
 
-      {/* FILTERS */}
-      <Card className="p-4 flex flex-col sm:flex-row items-center gap-3">
-        <div className="flex-1 w-full">
-          <Input
-            placeholder="Search expenses by title, staff name, or category..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={[
-              { value: 'all', label: 'All Claim Statuses' },
-              { value: 'pending', label: 'Pending Approval' },
-              { value: 'approved', label: 'Approved Claims' },
-              { value: 'paid', label: 'Paid & Settled' },
-              { value: 'rejected', label: 'Rejected Claims' },
-            ]}
-          />
-        </div>
-      </Card>
+      {/* DIRECTOR OVERALL EXPENSE BANNER & CARDS */}
+      {isDirector ? (
+        <div className="space-y-4">
+          <Card className="p-6 bg-gradient-to-r from-brand-900 via-brand-800 to-gray-900 text-white rounded-3xl shadow-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-brand-300">Overall Expense (All Staff)</p>
+                <h2 className="text-3xl font-black font-mono tracking-tight text-white mt-1">
+                  {formatINR(overallMonthlyTotal)}
+                </h2>
+                <p className="text-xs text-gray-300 mt-1 font-medium flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-brand-400" />
+                  Showing total company expenses for selected month
+                </p>
+              </div>
 
-      {/* EXPENSE CARDS GRID */}
-      {loading ? (
-        <p className="text-xs text-gray-400 animate-pulse text-center py-8">Loading expense records...</p>
-      ) : filteredExpenses.length === 0 ? (
-        <Card className="p-8 text-center text-gray-500 text-xs italic">
-          No expense claim records found matching criteria.
-        </Card>
+              <div className="flex gap-3 text-center">
+                <div className="bg-white/10 p-3 rounded-2xl border border-white/15 min-w-28">
+                  <p className="text-[10px] text-emerald-300 font-bold uppercase">Paid & Settled</p>
+                  <p className="text-base font-black font-mono text-emerald-400">{formatINR(overallPaidTotal)}</p>
+                </div>
+                <div className="bg-white/10 p-3 rounded-2xl border border-white/15 min-w-28">
+                  <p className="text-[10px] text-amber-300 font-bold uppercase">Pending</p>
+                  <p className="text-base font-black font-mono text-amber-400">{formatINR(overallPendingTotal)}</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* STAFF EXPENSE CARDS GRID */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-brand-600" />
+                Staff-Wise Expense Breakdown ({activeStaffList.length} Active Staff)
+              </h3>
+            </div>
+
+            {loadingStaff ? (
+              <p className="text-xs text-gray-400 animate-pulse text-center py-6">Loading staff expense summaries...</p>
+            ) : activeStaffList.length === 0 ? (
+              <Card className="p-6 text-center text-xs text-gray-500 italic">No active staff profiles found.</Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeStaffList.map((staff) => {
+                  const staffMonthlyExps = monthlyExpenses.filter((e) => e.userId === staff.userId || e.userId === staff.id);
+                  const staffSpend = staffMonthlyExps.reduce((sum, e) => sum + (e.amount || 0), 0);
+                  const staffPending = staffMonthlyExps.filter((e) => e.status === 'pending' || e.status === 'approved').reduce((sum, e) => sum + (e.amount || 0), 0);
+
+                  return (
+                    <Card key={staff.id} hoverable className="p-5 space-y-4 flex flex-col justify-between border-brand-100/70 shadow-sm">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          {staff.photoUrl ? (
+                            <img src={staff.photoUrl} alt={staff.fullName} className="w-12 h-12 rounded-xl object-cover border" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-lg">
+                              <User className="w-6 h-6" />
+                            </div>
+                          )}
+                          <div className="truncate">
+                            <h4 className="font-extrabold text-gray-900 truncate">{staff.fullName}</h4>
+                            <p className="text-xs text-brand-600 font-bold uppercase tracking-wider truncate">{staff.designation}</p>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-500 font-medium">This Month Spend:</span>
+                            <span className="font-mono font-black text-brand-600 text-sm">{formatINR(staffSpend)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-gray-400">Claims Recorded:</span>
+                            <span className="font-bold text-gray-700">{staffMonthlyExps.length}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-gray-400">Pending Amount:</span>
+                            <span className="font-bold text-amber-600 font-mono">{formatINR(staffPending)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs font-extrabold text-brand-600 hover:bg-brand-50"
+                        icon={<ArrowRight className="w-3.5 h-3.5" />}
+                        onClick={() => navigate(`/expenses/staff/${staff.userId}`)}
+                      >
+                        View Expense & Attendance →
+                      </Button>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredExpenses.map((exp) => (
-            <Card
-              key={exp.id}
-              hoverable
-              className="p-5 space-y-3 flex flex-col justify-between"
-              onClick={() => setSelectedExpense(exp)}
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="neutral" size="sm">
-                    {exp.category}
-                  </Badge>
-                  <Badge
-                    variant={
-                      exp.status === 'paid'
-                        ? 'success'
-                        : exp.status === 'approved'
-                        ? 'info'
-                        : exp.status === 'pending'
-                        ? 'warning'
-                        : 'danger'
-                    }
-                    size="sm"
-                  >
-                    {exp.status.toUpperCase()}
-                  </Badge>
+        /* STAFF PERSONAL EXPENSE BANNER */
+        <Card className="p-6 bg-gradient-to-r from-emerald-950 via-gray-900 to-emerald-900 text-white rounded-3xl shadow-xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-400">My Expense This Month</p>
+              <h2 className="text-3xl font-black font-mono tracking-tight text-white mt-1">
+                {formatINR(myMonthlyTotal)}
+              </h2>
+              <p className="text-xs text-gray-300 mt-1 font-medium">
+                Personal claim total calculated strictly from your logged-in account
+              </p>
+            </div>
+
+            <div className="flex gap-3 text-center">
+              <div className="bg-white/10 p-3 rounded-2xl border border-white/15 min-w-28">
+                <p className="text-[10px] text-emerald-300 font-bold uppercase">Paid Claims</p>
+                <p className="text-base font-black font-mono text-emerald-400">{formatINR(myPaidTotal)}</p>
+              </div>
+              <div className="bg-white/10 p-3 rounded-2xl border border-white/15 min-w-28">
+                <p className="text-[10px] text-amber-300 font-bold uppercase">Pending</p>
+                <p className="text-base font-black font-mono text-amber-400">{formatINR(myPendingTotal)}</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* FILTERS & EXPENSE LIST */}
+      <div className="space-y-4 pt-2">
+        <h3 className="text-base font-black text-gray-900">
+          {isDirector ? 'All Company Expense Claims Log' : 'My Claim History'}
+        </h3>
+
+        <Card className="p-4 flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex-1 w-full">
+            <Input
+              placeholder="Search expenses by title, staff name, or category..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              icon={<Search className="w-4 h-4" />}
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={[
+                { value: 'all', label: 'All Claim Statuses' },
+                { value: 'pending', label: 'Pending Approval' },
+                { value: 'approved', label: 'Approved Claims' },
+                { value: 'paid', label: 'Paid & Settled' },
+                { value: 'rejected', label: 'Rejected Claims' },
+              ]}
+            />
+          </div>
+        </Card>
+
+        {loadingExpenses ? (
+          <p className="text-xs text-gray-400 animate-pulse text-center py-8">Loading expense records...</p>
+        ) : filteredExpenses.length === 0 ? (
+          <Card className="p-8 text-center text-gray-500 text-xs italic">
+            No expense claim records found matching criteria for selected month.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredExpenses.map((exp) => (
+              <Card
+                key={exp.id}
+                hoverable
+                className="p-5 space-y-3 flex flex-col justify-between"
+                onClick={() => setSelectedExpense(exp)}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="neutral" size="sm">
+                      {exp.category}
+                    </Badge>
+                    <Badge
+                      variant={
+                        exp.status === 'paid'
+                          ? 'success'
+                          : exp.status === 'approved'
+                          ? 'info'
+                          : exp.status === 'pending'
+                          ? 'warning'
+                          : 'danger'
+                      }
+                      size="sm"
+                    >
+                      {exp.status.toUpperCase()}
+                    </Badge>
+                  </div>
+
+                  <h3 className="text-base font-extrabold text-gray-900 truncate">{exp.title}</h3>
+                  <p className="text-xl font-black text-brand-600 font-mono">{formatINR(exp.amount)}</p>
+                  {exp.description && <p className="text-xs text-gray-500 line-clamp-2">{exp.description}</p>}
                 </div>
 
-                <h3 className="text-base font-extrabold text-gray-900 truncate">{exp.title}</h3>
-                <p className="text-xl font-black text-brand-600 font-mono">{formatINR(exp.amount)}</p>
-                <p className="text-xs text-gray-500 line-clamp-2">{exp.description}</p>
-              </div>
-
-              <div className="pt-3 border-t border-gray-100 text-[11px] text-gray-400 flex justify-between">
-                <span>By {exp.userName}</span>
-                <span>{exp.date}</span>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+                <div className="pt-3 border-t border-gray-100 text-[11px] text-gray-400 flex justify-between">
+                  <span>By {exp.userName}</span>
+                  <span>{exp.date}</span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* CLAIM NEW EXPENSE MODAL */}
       <Modal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} title="Claim Expense Reimbursement">
@@ -332,7 +500,9 @@ export const ExpensesPage: React.FC = () => {
 
             <h3 className="text-lg font-extrabold text-gray-900">{selectedExpense.title}</h3>
             <p className="text-2xl font-black text-brand-600 font-mono">{formatINR(selectedExpense.amount)}</p>
-            <p className="text-xs text-gray-700 bg-gray-50 p-3 rounded-xl border">{selectedExpense.description}</p>
+            {selectedExpense.description && (
+              <p className="text-xs text-gray-700 bg-gray-50 p-3 rounded-xl border">{selectedExpense.description}</p>
+            )}
 
             {selectedExpense.receiptUrl && (
               <a

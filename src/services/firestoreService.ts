@@ -436,6 +436,118 @@ export async function recordDutyCheckOut(
   });
 }
 
+export async function createManualAttendance(data: {
+  userId: string;
+  userName: string;
+  userDesignation: string;
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  locationText?: string;
+  latitude?: number;
+  longitude?: number;
+  manualReason: string;
+  createdById: string;
+  createdByName: string;
+}): Promise<string> {
+  // Check duplicate attendance for date
+  const q = query(
+    collection(db, 'attendance'),
+    where('userId', '==', data.userId),
+    where('date', '==', data.date)
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    throw new Error('Attendance already exists for this date.');
+  }
+
+  let totalMinutes = 480;
+  try {
+    const parseTime = (tStr: string) => {
+      const match = tStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return 0;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+    const startM = parseTime(data.checkIn);
+    const endM = parseTime(data.checkOut);
+    if (endM > startM) totalMinutes = endM - startM;
+  } catch (e) {
+    // fallback
+  }
+
+  const locationObj = {
+    latitude: data.latitude || 0,
+    longitude: data.longitude || 0,
+    accuracy: 0,
+    capturedAt: new Date().toISOString(),
+  };
+
+  const newDoc: Omit<AttendanceRecord, 'id'> = {
+    userId: data.userId,
+    userName: data.userName,
+    userDesignation: data.userDesignation,
+    date: data.date,
+    checkIn: data.checkIn,
+    checkOut: data.checkOut,
+    checkInLocation: locationObj,
+    checkOutLocation: locationObj,
+    totalMinutes,
+    status: 'completed',
+    attendanceType: 'MANUAL',
+    manualReason: data.manualReason,
+    createdById: data.createdById,
+    createdByName: data.createdByName,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const docRef = await addDoc(collection(db, 'attendance'), newDoc);
+  return docRef.id;
+}
+
+export async function autoCloseStaleAttendance(records: AttendanceRecord[]): Promise<void> {
+  const nowIST = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' });
+  const currentHourIST = parseInt(
+    new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit' }),
+    10
+  );
+
+  for (const record of records) {
+    if (!record.checkIn || record.checkOut) continue;
+
+    const recordDate = record.date;
+    const isPastDate = recordDate < nowIST;
+    const isTodayAfter9PM = recordDate === nowIST && currentHourIST >= 21;
+
+    if (isPastDate || isTodayAfter9PM) {
+      try {
+        const docRef = doc(db, 'attendance', record.id);
+        await updateDoc(docRef, {
+          checkOut: '09:00 PM',
+          checkOutLocation: {
+            latitude: 0,
+            longitude: 0,
+            accuracy: 0,
+            capturedAt: new Date().toISOString(),
+            address: 'Automatic Closed',
+          },
+          status: 'auto_closed',
+          checkoutType: 'AUTO',
+          isAutoClosed: true,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error('Failed to auto-close stale attendance:', record.id, e);
+      }
+    }
+  }
+}
+
 // Work Assignments
 export async function createWorkAssignment(work: Omit<WorkAssignment, 'id'>): Promise<string> {
   const docRef = await addDoc(collection(db, 'workAssignments'), work);

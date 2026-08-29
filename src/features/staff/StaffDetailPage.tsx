@@ -10,7 +10,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getStaffProfileById, saveStaffProfile, setUserDoc, softDeleteStaffProfile } from '../../services/firestoreService';
 import { StaffProfile } from '../../types';
-import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTriangle, Receipt } from 'lucide-react';
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -321,6 +321,15 @@ export const StaffDetailPage: React.FC = () => {
 
           {/* ACTIONS */}
           <div className="space-y-2 pt-2 border-t border-gray-100">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-brand-600 border-brand-200 hover:bg-brand-50"
+              icon={<Receipt className="w-4 h-4" />}
+              onClick={() => navigate(`/expenses/staff/${staff.userId}`)}
+            >
+              Expense & Attendance Log
+            </Button>
             {staff.approvalStatus !== 'approved' && (
               <Button
                 variant="primary"

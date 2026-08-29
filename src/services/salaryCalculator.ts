@@ -102,9 +102,17 @@ export function calculateSalaryBreakdown(
     const dateObj = new Date(year, monthIdx, day);
     const isSunday = dateObj.getDay() === 0;
     const isCompanyHoliday = holidaySet.has(dateStr);
-    const attendance = attendanceMap.get(dateStr);
+    const isWorkedDay = attendance && (
+      attendance.status === 'present' ||
+      attendance.status === 'on_duty' ||
+      attendance.status === 'completed' ||
+      attendance.status === 'auto_closed' ||
+      attendance.isAutoClosed === true ||
+      attendance.attendanceType === 'MANUAL' ||
+      Boolean(attendance.checkIn)
+    );
 
-    if (attendance && (attendance.status === 'present' || attendance.status === 'on_duty')) {
+    if (isWorkedDay) {
       workedDays++;
     } else if (attendance && attendance.status === 'paid_leave') {
       if (emergencyLeavesUsed < emergencyLeaveAllowed) {

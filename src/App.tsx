@@ -21,6 +21,7 @@ import { WorkAssignmentPage } from './features/work/WorkAssignmentPage';
 import { AttendancePage } from './features/attendance/AttendancePage';
 import { ChatPage } from './features/chat/ChatPage';
 import { ExpensesPage } from './features/expenses/ExpensesPage';
+import { StaffExpenseDetailPage } from './features/expenses/StaffExpenseDetailPage';
 import { SalaryPage } from './features/salary/SalaryPage';
 import { StaffListPage } from './features/staff/StaffListPage';
 import { StaffDetailPage } from './features/staff/StaffDetailPage';
@@ -78,6 +79,7 @@ export const App: React.FC = () => {
                           <Route path="attendance" element={<AttendancePage />} />
                           <Route path="chat" element={<ChatPage />} />
                           <Route path="expenses" element={<ExpensesPage />} />
+                          <Route path="expenses/staff/:staffId" element={<StaffExpenseDetailPage />} />
                           <Route path="salary" element={<SalaryPage />} />
                           <Route path="staff" element={<StaffListPage />} />
                           <Route path="staff/:id" element={<StaffDetailPage />} />

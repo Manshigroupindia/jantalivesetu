@@ -212,3 +212,48 @@ exports.createStaffAccount = functions.https.onCall(async (data, context) => {
 
   return { success: true, uid };
 });
+
+/**
+ * Scheduled Cloud Function: Auto-close open attendance sessions daily at 9:00 PM (21:00 IST)
+ * Timezone: Asia/Kolkata
+ */
+exports.autoCloseOpenAttendance = functions.pubsub
+  .schedule("0 21 * * *")
+  .timeZone("Asia/Kolkata")
+  .onRun(async (context) => {
+    // Current ISO date in Asia/Kolkata timezone (YYYY-MM-DD)
+    const todayISO = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Kolkata" });
+    const snapshot = await db.collection("attendance")
+      .where("date", "==", todayISO)
+      .get();
+
+    const batch = db.batch();
+    let count = 0;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.checkIn && !data.checkOut) {
+        batch.update(docSnap.ref, {
+          checkOut: "09:00 PM",
+          checkOutLocation: {
+            latitude: 0,
+            longitude: 0,
+            accuracy: 0,
+            capturedAt: new Date().toISOString(),
+            address: "Automatic Closed",
+          },
+          status: "auto_closed",
+          checkoutType: "AUTO",
+          isAutoClosed: true,
+          updatedAt: new Date().toISOString(),
+        });
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      await batch.commit();
+    }
+    console.log(`Auto-closed ${count} open attendance records for ${todayISO}`);
+    return null;
+  });

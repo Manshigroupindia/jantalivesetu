@@ -106,7 +106,13 @@ export interface AttendanceRecord {
   checkInLocation: LocationRecord;
   checkOutLocation?: LocationRecord;
   totalMinutes: number;
-  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'completed' | 'paid_leave';
+  status: 'present' | 'absent' | 'half_day' | 'on_duty' | 'completed' | 'auto_closed' | 'paid_leave';
+  attendanceType?: 'REGULAR' | 'MANUAL' | 'AUTO';
+  isAutoClosed?: boolean;
+  checkoutType?: 'REGULAR' | 'AUTO';
+  manualReason?: string;
+  createdById?: string;
+  createdByName?: string;
   createdAt: string;
   updatedAt: string;
 }
