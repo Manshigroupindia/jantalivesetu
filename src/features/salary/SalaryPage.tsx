@@ -42,13 +42,19 @@ export const SalaryPage: React.FC = () => {
 
   useEffect(() => {
     if (!canViewAll && staffProfile) {
-      setSelectedStaffId(staffProfile.userId);
+      if (selectedStaffId !== staffProfile.userId) {
+        setSelectedStaffId(staffProfile.userId);
+      }
     } else if (staffList.length > 0) {
       if (!selectedStaffId || !staffList.some((s) => s.userId === selectedStaffId)) {
-        setSelectedStaffId(staffList[0].userId);
+        if (selectedStaffId !== staffList[0].userId) {
+          setSelectedStaffId(staffList[0].userId);
+        }
       }
     } else {
-      setSelectedStaffId('');
+      if (selectedStaffId !== '') {
+        setSelectedStaffId('');
+      }
     }
   }, [staffList, staffProfile, canViewAll, selectedStaffId]);
 

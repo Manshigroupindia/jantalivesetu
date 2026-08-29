@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
@@ -12,6 +13,7 @@ import { usePWA } from '../../contexts/PWAContext';
 import { AlertCircle, X } from 'lucide-react';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
   const { installMessage, clearInstallMessage } = usePWA();
 
   return (
@@ -49,7 +51,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <Header />
 
           {/* MAIN PAGE VIEW */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto animate-in fade-in duration-200">
+          <main key={location.pathname} className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto animate-in fade-in duration-200">
             {children}
           </main>
         </div>

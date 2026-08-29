@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useRealtimeCollection } from './useRealtime';
 import { StaffProfile, User } from '../types';
 
@@ -108,11 +109,12 @@ export function useActiveStaff(): UseActiveStaffResult {
     }
   });
 
-  const activeStaffList = Array.from(activeStaffMap.values());
-
-  return {
-    activeStaffList,
-    activeStaffMap,
-    loading,
-  };
+  return useMemo(() => {
+    const activeStaffList = Array.from(activeStaffMap.values());
+    return {
+      activeStaffList,
+      activeStaffMap,
+      loading,
+    };
+  }, [rawStaffProfiles, rawUsers, loading]);
 }
