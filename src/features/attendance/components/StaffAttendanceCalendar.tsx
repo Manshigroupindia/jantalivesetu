@@ -5,7 +5,7 @@ import { Select } from '../../../components/ui/Select';
 import { Badge } from '../../../components/ui/Badge';
 import { Modal } from '../../../components/ui/Modal';
 import { GoogleMapsButton } from '../../../components/common/GoogleMapsButton';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, AlertCircle, Sparkles, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, AlertCircle, Sparkles, User, PlusCircle } from 'lucide-react';
 import { useRealtimeCollection } from '../../../hooks/useRealtime';
 import { AttendanceRecord, CompanyHoliday, StaffProfile } from '../../../types';
 import { getCurrentDateISO, formatMonthYear } from '../../../utils/dateUtils';
@@ -18,6 +18,7 @@ interface StaffAttendanceCalendarProps {
   canSelectStaff?: boolean;
   staffList?: StaffProfile[];
   onSelectStaffId?: (id: string) => void;
+  onOpenManualModal?: () => void;
 }
 
 export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = ({
@@ -26,6 +27,7 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
   canSelectStaff = false,
   staffList = [],
   onSelectStaffId,
+  onOpenManualModal,
 }) => {
   const todayISO = getCurrentDateISO();
   const [selectedMonth, setSelectedMonth] = useState<string>(todayISO.substring(0, 7)); // YYYY-MM
@@ -184,17 +186,34 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
           )}
         </div>
 
-        {/* STAFF SELECTOR FOR DIRECTOR */}
-        {canSelectStaff && staffList.length > 0 && onSelectStaffId && (
-          <div className="w-full sm:w-72">
-            <Select
-              value={targetUserId}
-              onChange={(e) => onSelectStaffId(e.target.value)}
-              options={staffList.map((s) => ({
-                value: s.userId,
-                label: `${s.fullName} (${s.designation})`,
-              }))}
-            />
+        {/* STAFF SELECTOR AND MANUAL ATTENDANCE BUTTON FOR DIRECTOR */}
+        {canSelectStaff && (
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            {staffList.length > 0 && onSelectStaffId && (
+              <div className="w-full sm:w-64">
+                <Select
+                  value={targetUserId}
+                  onChange={(e) => onSelectStaffId(e.target.value)}
+                  options={staffList.map((s) => ({
+                    value: s.userId,
+                    label: `${s.fullName} (${s.designation})`,
+                  }))}
+                />
+              </div>
+            )}
+
+            {onOpenManualModal && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<PlusCircle className="w-4 h-4" />}
+                onClick={onOpenManualModal}
+                className="w-full sm:w-auto whitespace-nowrap justify-center"
+              >
+                <span className="hidden sm:inline">+ Manual Attendance</span>
+                <span className="sm:hidden">+ Manual Attendance</span>
+              </Button>
+            )}
           </div>
         )}
       </Card>

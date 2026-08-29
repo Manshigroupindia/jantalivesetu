@@ -24,7 +24,8 @@ const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 
 export const AttendancePage: React.FC = () => {
   const { userDoc, staffProfile: currentUserProfile } = useAuth();
-  const { isDirector } = usePermissions();
+  const { isDirector, isAdmin } = usePermissions();
+  const canManageAttendance = isDirector || isAdmin;
   const { requirePinVerification } = useSecurity();
   const { showToast } = useNotification();
 
@@ -153,13 +154,13 @@ export const AttendancePage: React.FC = () => {
           </p>
         </div>
 
-        {isDirector && (
+        {canManageAttendance && (
           <Button
             variant="primary"
             icon={<PlusCircle className="w-4 h-4" />}
             onClick={() => setManualModalOpen(true)}
           >
-            Add Manual Attendance (PIN)
+            + Manual Attendance
           </Button>
         )}
       </div>
@@ -204,6 +205,7 @@ export const AttendancePage: React.FC = () => {
           canSelectStaff={isDirector}
           staffList={activeStaffList}
           onSelectStaffId={(id) => setSelectedDirectorStaffId(id)}
+          onOpenManualModal={canManageAttendance ? () => setManualModalOpen(true) : undefined}
         />
       )}
 
