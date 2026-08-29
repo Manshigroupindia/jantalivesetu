@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { SecurityProvider } from './contexts/SecurityContext';
@@ -75,6 +75,7 @@ export const App: React.FC = () => {
                     <ProtectedRoute>
                       <AppShell>
                         <Routes>
+                          <Route index element={<Navigate to="/dashboard" replace />} />
                           <Route path="dashboard" element={<DashboardResolver />} />
                           <Route path="profile" element={<ProfilePage />} />
                           <Route path="work" element={<WorkAssignmentPage />} />

@@ -39,14 +39,26 @@ export class ErrorBoundary extends Component<Props, State> {
                 An unexpected interface error occurred. Please try reloading the page.
               </p>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<RotateCcw className="w-4 h-4" />}
-              onClick={() => window.location.reload()}
-            >
-              Reload Page
-            </Button>
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.href = '/dashboard';
+                }}
+              >
+                Go to Dashboard
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<RotateCcw className="w-4 h-4" />}
+                onClick={() => window.location.reload()}
+              >
+                Reload Page
+              </Button>
+            </div>
             <p className="text-[11px] text-gray-400">Secure with Janta Live Setu</p>
           </div>
         </div>
