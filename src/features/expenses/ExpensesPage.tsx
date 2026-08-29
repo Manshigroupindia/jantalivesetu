@@ -18,6 +18,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { formatINR } from '../../utils/formatters';
 import { getCurrentDateISO, getCurrentMonthKey } from '../../utils/dateUtils';
 import { where } from 'firebase/firestore';
+import { useActiveStaff } from '../../hooks/useActiveStaff';
 
 export const ExpensesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -49,10 +50,7 @@ export const ExpensesPage: React.FC = () => {
     : [where('userId', '==', userDoc?.uid || 'none')];
 
   const { data: rawExpenses, loading: loadingExpenses } = useRealtimeCollection<ExpenseItem>('expenses', expenseConstraints);
-  const { data: staffProfiles, loading: loadingStaff } = useRealtimeCollection<StaffProfile>('staffProfiles');
-
-  // Filter active staff (excluding soft-deleted staff)
-  const activeStaffList = staffProfiles.filter((s) => s.approvalStatus !== 'deleted' && s.status !== 'deleted');
+  const { activeStaffList, loading: loadingStaff } = useActiveStaff();
 
   // Sorted Expenses
   const expenses = [...rawExpenses].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));

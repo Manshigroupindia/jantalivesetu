@@ -16,15 +16,15 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { WorkAssignment, WorkPriority, WorkStatus, StaffProfile } from '../../types';
 import { createWorkAssignment, updateWorkAssignmentStatus } from '../../services/firestoreService';
 import { orderBy } from 'firebase/firestore';
+import { useActiveStaff } from '../../hooks/useActiveStaff';
 
 export const WorkAssignmentPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { can, isDirector } = usePermissions();
-  const { showToast } = useNotification();
   const { data: assignments, loading } = useRealtimeCollection<WorkAssignment>('workAssignments', [
     orderBy('createdAt', 'desc'),
   ]);
-  const { data: staffList } = useRealtimeCollection<StaffProfile>('staffProfiles');
+  const { activeStaffList: staffList } = useActiveStaff();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedWork, setSelectedWork] = useState<WorkAssignment | null>(null);

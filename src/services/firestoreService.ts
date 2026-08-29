@@ -403,13 +403,32 @@ export async function deleteStaffProfile(userId: string): Promise<void> {
     throw new Error('Staff ID is required for permanent deletion.');
   }
 
-  // Delete all staff profiles matching userId
-  const q = query(collection(db, 'staffProfiles'), where('userId', '==', userId));
-  const snap = await getDocs(q);
-  for (const d of snap.docs) {
-    await deleteDoc(d.ref);
+  // 1. Fetch user doc or staff profile to get target email for orphan cleanup
+  const [userDocSnap, profileDocSnap] = await Promise.all([
+    getDoc(doc(db, 'users', userId)).catch(() => null),
+    getDoc(doc(db, 'staffProfiles', userId)).catch(() => null),
+  ]);
+
+  const userEmail = (userDocSnap && userDocSnap.exists() ? (userDocSnap.data() as User).email : null) ||
+                    (profileDocSnap && profileDocSnap.exists() ? (profileDocSnap.data() as StaffProfile).email : null);
+
+  // 2. Delete all staffProfiles where userId == userId
+  const qByUserId = query(collection(db, 'staffProfiles'), where('userId', '==', userId));
+  const snapByUserId = await getDocs(qByUserId);
+  for (const d of snapByUserId.docs) {
+    await deleteDoc(d.ref).catch(() => {});
   }
 
+  // 3. Delete all staffProfiles matching email if available
+  if (userEmail) {
+    const qByEmail = query(collection(db, 'staffProfiles'), where('email', '==', userEmail.trim().toLowerCase()));
+    const snapByEmail = await getDocs(qByEmail);
+    for (const d of snapByEmail.docs) {
+      await deleteDoc(d.ref).catch(() => {});
+    }
+  }
+
+  // 4. Delete canonical documents
   await deleteDoc(doc(db, 'staffProfiles', userId)).catch(() => {});
   await deleteDoc(doc(db, 'users', userId)).catch(() => {});
 }

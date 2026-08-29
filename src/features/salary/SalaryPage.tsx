@@ -18,6 +18,8 @@ import { saveSalaryRecord, saveStaffProfile } from '../../services/firestoreServ
 import { logAuditEvent } from '../../services/auditService';
 import { useNotification } from '../../contexts/NotificationContext';
 
+import { useActiveStaff } from '../../hooks/useActiveStaff';
+
 export const SalaryPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { isDirector, isAdmin } = usePermissions();
@@ -34,17 +36,21 @@ export const SalaryPage: React.FC = () => {
   const [newSalary, setNewSalary] = useState<number>(0);
   const [savingSalary, setSavingSalary] = useState(false);
 
-  const { data: staffList = [], loading: staffLoading } = useRealtimeCollection<StaffProfile>('staffProfiles');
+  const { activeStaffList: staffList, loading: staffLoading } = useActiveStaff();
   const { data: attendanceLogs = [] } = useRealtimeCollection<AttendanceRecord>('attendance');
   const { data: holidays = [] } = useRealtimeCollection<CompanyHoliday>('holidays');
 
   useEffect(() => {
     if (!canViewAll && staffProfile) {
       setSelectedStaffId(staffProfile.userId);
-    } else if (staffList.length > 0 && !selectedStaffId) {
-      setSelectedStaffId(staffList[0].userId);
+    } else if (staffList.length > 0) {
+      if (!selectedStaffId || !staffList.some((s) => s.userId === selectedStaffId)) {
+        setSelectedStaffId(staffList[0].userId);
+      }
+    } else {
+      setSelectedStaffId('');
     }
-  }, [staffList, staffProfile, canViewAll]);
+  }, [staffList, staffProfile, canViewAll, selectedStaffId]);
 
   useEffect(() => {
     if (!selectedStaffId) return;

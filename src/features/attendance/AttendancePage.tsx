@@ -18,6 +18,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { createManualAttendance, autoCloseStaleAttendance } from '../../services/firestoreService';
 import { where } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
+import { useActiveStaff } from '../../hooks/useActiveStaff';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
@@ -54,14 +55,8 @@ export const AttendancePage: React.FC = () => {
   const [manualReason, setManualReason] = useState('');
   const [submittingManual, setSubmittingManual] = useState(false);
 
-  const constraints = isDirector
-    ? []
-    : [where('userId', '==', userDoc?.uid || 'none')];
-
   const { data: rawAttendanceList, loading } = useRealtimeCollection<AttendanceRecord>('attendance', constraints);
-  const { data: staffProfiles } = useRealtimeCollection<StaffProfile>('staffProfiles');
-
-  const activeStaffList = staffProfiles.filter((s) => s.approvalStatus !== 'deleted' && s.status !== 'deleted');
+  const { activeStaffList } = useActiveStaff();
 
   useEffect(() => {
     if (activeStaffList.length > 0 && !selectedDirectorStaffId) {
