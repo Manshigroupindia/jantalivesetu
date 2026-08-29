@@ -115,7 +115,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
-      allow delete: if isDirector();
+      allow delete: if isDirector() || isAdmin() || (
+        isAuthenticated() && (
+          (resource.data.loggedById != null && resource.data.loggedById == request.auth.uid) ||
+          (resource.data.loggedByUserId != null && resource.data.loggedByUserId == request.auth.uid) ||
+          (resource.data.userId != null && resource.data.userId == request.auth.uid)
+        )
+      );
     }
 
     // TEA RECORDS (ALIAS)
@@ -123,7 +129,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
-      allow delete: if isDirector();
+      allow delete: if isDirector() || isAdmin() || (
+        isAuthenticated() && (
+          (resource.data.loggedById != null && resource.data.loggedById == request.auth.uid) ||
+          (resource.data.loggedByUserId != null && resource.data.loggedByUserId == request.auth.uid) ||
+          (resource.data.userId != null && resource.data.userId == request.auth.uid)
+        )
+      );
     }
 
     // WATER RECORDS
@@ -131,7 +143,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isApproved();
       allow update: if isAuthenticated() && isApproved();
-      allow delete: if isDirector();
+      allow delete: if isDirector() || isAdmin() || (
+        isAuthenticated() && (
+          (resource.data.loggedById != null && resource.data.loggedById == request.auth.uid) ||
+          (resource.data.loggedByUserId != null && resource.data.loggedByUserId == request.auth.uid) ||
+          (resource.data.userId != null && resource.data.userId == request.auth.uid)
+        )
+      );
     }
 
     // ELECTRICITY RECORDS

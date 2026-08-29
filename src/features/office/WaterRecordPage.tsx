@@ -212,7 +212,13 @@ export const WaterRecordPage: React.FC = () => {
           showToast('Water record deleted successfully.', 'success');
         } catch (err: any) {
           console.error('Failed to delete water record:', err);
-          showToast('Failed to delete record.', 'error');
+          if (err?.code === 'permission-denied') {
+            showToast('Permission Denied: You do not have permission to delete this water record.', 'error');
+          } else if (err?.code === 'not-found' || err?.message?.includes('not found')) {
+            showToast('This water record has already been removed.', 'info');
+          } else {
+            showToast(err?.message || 'Failed to delete record. Please check connection and try again.', 'error');
+          }
         }
       },
     });
