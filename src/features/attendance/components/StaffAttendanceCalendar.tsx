@@ -134,12 +134,16 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
 
     const { status: attStatus, fraction } = getAttendanceStatusAndFraction(attendance);
 
-    let status: 'present' | 'half_day' | 'absent' | 'sunday' | 'holiday' | 'future' = 'absent';
+    let status: 'present' | 'half_day' | 'absent' | 'sunday' | 'holiday' | 'future' | 'covered_leave' = 'absent';
 
     if (isFuture) {
       status = 'future';
     } else if (attendance) {
-      if (attStatus === 'ABSENT' || attendance.status === 'absent') {
+      if (attendance.status === 'covered_leave' || attendance.coveredBySundayDate) {
+        status = 'covered_leave';
+      } else if (attendance.status === 'sunday' || isSunday) {
+        status = 'sunday';
+      } else if (attStatus === 'ABSENT' || attendance.status === 'absent') {
         status = 'absent';
       } else if (attStatus === 'HALF_DAY' || fraction === 0.5) {
         status = 'half_day';
@@ -438,6 +442,11 @@ export const StaffAttendanceCalendar: React.FC<StaffAttendanceCalendarProps> = (
                 {selectedDayDetail.status === 'half_day' && (
                   <Badge variant="warning" size="md" className="bg-amber-100 text-amber-900 border-amber-300">
                     Half Day (0.5x)
+                  </Badge>
+                )}
+                {selectedDayDetail.status === 'covered_leave' && (
+                  <Badge variant="success" size="md" className="bg-teal-100 text-teal-900 border-teal-300">
+                    Covered Leave (0 Deduction)
                   </Badge>
                 )}
                 {selectedDayDetail.status === 'sunday' && (
