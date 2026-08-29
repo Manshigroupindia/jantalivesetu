@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Trash2, Check, AlertCircle, RefreshCw, Loader2, Play, Pause } from 'lucide-react';
+import { Mic, Square, Trash2, Check, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { uploadAudioToCloudinary } from '../../services/cloudinaryService';
 import { useNotification } from '../../contexts/NotificationContext';

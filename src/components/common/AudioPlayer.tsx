@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, Mic, AlertCircle } from 'lucide-react';
+import { Mic, AlertCircle } from 'lucide-react';
 
 export interface AudioPlayerProps {
   src: string;
@@ -8,30 +8,12 @@ export interface AudioPlayerProps {
 }
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, title = 'Voice Instruction', className = '' }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
   const [hasError, setHasError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     setHasError(false);
-    setIsPlaying(false);
   }, [src]);
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
-          console.error('Audio play error:', err);
-          setHasError(true);
-        });
-    }
-  };
 
   if (!src) return null;
 
@@ -59,9 +41,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, title = 'Voice In
             src={src}
             controls
             preload="metadata"
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onEnded={() => setIsPlaying(false)}
             onError={() => setHasError(true)}
             className="w-full h-10 rounded-lg accent-brand-600"
           />
