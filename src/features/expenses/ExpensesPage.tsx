@@ -19,6 +19,7 @@ import { formatINR } from '../../utils/formatters';
 import { getCurrentDateISO, getCurrentMonthKey } from '../../utils/dateUtils';
 import { where } from 'firebase/firestore';
 import { useActiveStaff } from '../../hooks/useActiveStaff';
+import { sendNotification } from '../../services/pushNotificationService';
 
 export const ExpensesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -107,6 +108,16 @@ export const ExpensesPage: React.FC = () => {
         updatedAt: new Date().toISOString(),
       });
 
+      // Trigger Push Notification to Directors
+      sendNotification({
+        targetRole: 'director',
+        title: 'New Expense Claim Submitted',
+        body: `${staffProfile?.fullName || userDoc.name || 'Staff'} submitted an expense claim of ₹${amount}.`,
+        url: '/expenses',
+        type: 'expense_added',
+        metadata: { amount, title }
+      }).catch((err) => console.warn('[Notification Error]', err));
+
       setCreateModalOpen(false);
       setTitle('');
       setAmount(500);
@@ -125,6 +136,15 @@ export const ExpensesPage: React.FC = () => {
     requirePinVerification('Approve Expense Reimbursement Claim', async () => {
       try {
         await updateExpenseStatus(expId, 'approved', userDoc?.uid, 'Approved by Director');
+        if (selectedExpense) {
+          sendNotification({
+            recipientUserId: selectedExpense.userId,
+            title: 'Expense Claim Approved',
+            body: `Your reimbursement claim "${selectedExpense.title}" of ₹${selectedExpense.amount} was approved.`,
+            url: '/expenses',
+            type: 'expense_added'
+          }).catch((err) => console.warn('[Notification Error]', err));
+        }
         setSelectedExpense(null);
         showToast('Expense approved successfully.', 'success');
       } catch (err) {
@@ -137,6 +157,15 @@ export const ExpensesPage: React.FC = () => {
     requirePinVerification('Payout Expense Reimbursement', async () => {
       try {
         await updateExpenseStatus(expId, 'paid', userDoc?.uid, 'Payout Processed');
+        if (selectedExpense) {
+          sendNotification({
+            recipientUserId: selectedExpense.userId,
+            title: 'Expense Reimbursement Disbursed',
+            body: `Your reimbursement claim "${selectedExpense.title}" of ₹${selectedExpense.amount} has been paid.`,
+            url: '/expenses',
+            type: 'expense_added'
+          }).catch((err) => console.warn('[Notification Error]', err));
+        }
         setSelectedExpense(null);
         showToast('Expense marked as Paid.', 'success');
       } catch (err) {

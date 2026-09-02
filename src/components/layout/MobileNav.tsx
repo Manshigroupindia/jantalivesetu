@@ -7,12 +7,14 @@ import {
   ChevronRight,
   MoreHorizontal,
   Lock,
-  Download
+  Download,
+  Bell
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { usePWA } from '../../contexts/PWAContext';
+import { usePushNotification } from '../../contexts/PushNotificationContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { signOutUser } from '../../services/authService';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -23,6 +25,7 @@ export const MobileNav: React.FC = () => {
   const { companySettings } = useCompany();
   const { userDoc, staffProfile } = useAuth();
   const { lockPinSession } = useSecurity();
+  const { unreadCount, openCenter } = usePushNotification();
   const { isStandalone, triggerInstall } = usePWA();
   const { can, role, isDirector } = usePermissions();
   const { showConfirm } = useNotification();
@@ -98,6 +101,21 @@ export const MobileNav: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* MOBILE NOTIFICATION BELL */}
+          <button
+            onClick={openCenter}
+            className="relative p-1.5 text-gray-700 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all active:scale-95"
+            title="Notification Center"
+            aria-label="Notification Center"
+          >
+            <Bell className="w-5 h-5 text-gray-700" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-brand-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 uppercase border border-brand-200">
             {role || 'Staff'}
           </span>

@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { usePWA } from '../../contexts/PWAContext';
+import { usePushNotification } from '../../contexts/PushNotificationContext';
 import { getCurrentDateISO, getCurrentTimeFormatted } from '../../utils/dateUtils';
-import { Lock, Clock, ShieldCheck, Download } from 'lucide-react';
+import { Lock, Clock, ShieldCheck, Download, Bell } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export const Header: React.FC = () => {
@@ -12,6 +13,7 @@ export const Header: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
   const { lockPinSession } = useSecurity();
   const { isStandalone, triggerInstall } = usePWA();
+  const { unreadCount, openCenter } = usePushNotification();
   const [timeStr, setTimeStr] = useState(getCurrentTimeFormatted());
 
   useEffect(() => {
@@ -40,6 +42,21 @@ export const Header: React.FC = () => {
 
       {/* RIGHT: ACTIONS & LOCK */}
       <div className="flex items-center gap-3">
+        {/* NOTIFICATION BELL BUTTON */}
+        <button
+          onClick={openCenter}
+          className="relative p-2 text-gray-600 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all active:scale-95 border border-gray-100 hover:border-brand-200"
+          title="Notification Center"
+          aria-label="Notification Center"
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-brand-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+
         {/* INSTALL APP BUTTON (PERMANENT WHEN NOT STANDALONE) */}
         {!isStandalone && (
           <Button

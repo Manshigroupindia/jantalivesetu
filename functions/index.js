@@ -257,3 +257,126 @@ exports.autoCloseOpenAttendance = functions.pubsub
     console.log(`Auto-closed ${count} open attendance records for ${todayISO}`);
     return null;
   });
+
+/**
+ * Callable Function: Send Secure Push Notification via FCM Admin SDK
+ */
+exports.sendPushNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required to send notifications.");
+  }
+
+  const { recipientUserId, recipientUserIds, targetRole, title, body, url, type, metadata } = data;
+  if (!title || !body) {
+    throw new functions.https.HttpsError("invalid-argument", "Notification title and body are required.");
+  }
+
+  const targetUids = new Set();
+  if (recipientUserId) targetUids.add(recipientUserId);
+  if (Array.isArray(recipientUserIds)) {
+    recipientUserIds.forEach((uid) => { if (uid) targetUids.add(uid); });
+  }
+
+  if (targetRole) {
+    const roleSnapshot = await db.collection("users")
+      .where("role", "==", targetRole)
+      .get();
+    roleSnapshot.forEach((docSnap) => targetUids.add(docSnap.id));
+
+    if (targetRole === "director" || targetRole === "admin") {
+      const altRole = targetRole === "director" ? "Director" : "Admin";
+      const altSnapshot = await db.collection("users")
+        .where("role", "==", altRole)
+        .get();
+      altSnapshot.forEach((docSnap) => targetUids.add(docSnap.id));
+    }
+  }
+
+  const finalRecipientUids = Array.from(targetUids);
+  if (finalRecipientUids.length === 0) {
+    return { success: true, count: 0, message: "No recipients target found." };
+  }
+
+  const allTokens = [];
+  const tokenDocRefs = [];
+
+  // Write notification items to history & collect FCM tokens
+  for (const uid of finalRecipientUids) {
+    await db.collection("notifications").add({
+      recipientUserId: uid,
+      title,
+      body,
+      url: url || "/",
+      type: type || "general",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      read: false,
+      createdBy: context.auth.uid,
+      metadata: metadata || {}
+    });
+
+    const tokensSnap = await db.collection("users")
+      .doc(uid)
+      .collection("notificationTokens")
+      .where("enabled", "==", true)
+      .get();
+
+    tokensSnap.forEach((tSnap) => {
+      const tokenData = tSnap.data();
+      if (tokenData && tokenData.token) {
+        allTokens.push(tokenData.token);
+        tokenDocRefs.push(tSnap.ref);
+      }
+    });
+  }
+
+  if (allTokens.length === 0) {
+    return { success: true, count: 0, message: "History saved, but no active FCM tokens registered for recipients." };
+  }
+
+  try {
+    const multicastMessage = {
+      notification: { title, body },
+      data: {
+        title,
+        body,
+        url: url || "/",
+        type: type || "general",
+        eventId: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      },
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: "/pwa-192.png",
+          badge: "/pwa-192.png",
+          click_action: url || "/"
+        },
+        fcmOptions: {
+          link: url || "/"
+        }
+      },
+      tokens: allTokens
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(multicastMessage);
+
+    // Clean up dead tokens
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) {
+        const errCode = resp.error?.code;
+        if (errCode === "messaging/invalid-registration-token" || errCode === "messaging/registration-token-not-registered") {
+          const badRef = tokenDocRefs[idx];
+          if (badRef) {
+            badRef.update({ enabled: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+          }
+        }
+      }
+    });
+
+    return { success: true, successCount: response.successCount, failureCount: response.failureCount };
+  } catch (err) {
+    console.error("[FCM Cloud Function Error]", err);
+    return { success: false, error: err.message };
+  }
+});
+

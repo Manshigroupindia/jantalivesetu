@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { FileUploader } from '../../components/common/FileUploader';
+import { NotificationSettingsCard } from '../../components/common/NotificationSettingsCard';
 import { Settings, Lock, Building } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { setCompanySettings } from '../../services/firestoreService';
@@ -133,31 +134,35 @@ export const SettingsPage: React.FC = () => {
         </Card>
 
         {/* SECURITY PIN UPDATE */}
-        <Card className="p-6 space-y-4">
-          <h3 className="text-base font-extrabold text-gray-900 border-b pb-2 flex items-center gap-2">
-            <Lock className="w-5 h-5 text-brand-600" /> Update Security PIN
-          </h3>
+        <div className="space-y-6">
+          <Card className="p-6 space-y-4">
+            <h3 className="text-base font-extrabold text-gray-900 border-b pb-2 flex items-center gap-2">
+              <Lock className="w-5 h-5 text-brand-600" /> Update Security PIN
+            </h3>
 
-          <Input
-            label="New 4-Digit PIN"
-            type="password"
-            maxLength={4}
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-          />
+            <Input
+              label="New 4-Digit PIN"
+              type="password"
+              maxLength={4}
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            />
 
-          <Input
-            label="Confirm New PIN"
-            type="password"
-            maxLength={4}
-            value={confirmPin}
-            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-          />
+            <Input
+              label="Confirm New PIN"
+              type="password"
+              maxLength={4}
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            />
 
-          <Button variant="secondary" className="w-full" onClick={handleUpdatePin}>
-            Update Security PIN
-          </Button>
-        </Card>
+            <Button variant="secondary" className="w-full" onClick={handleUpdatePin}>
+              Update Security PIN
+            </Button>
+          </Card>
+
+          <NotificationSettingsCard />
+        </div>
       </div>
     </div>
   );

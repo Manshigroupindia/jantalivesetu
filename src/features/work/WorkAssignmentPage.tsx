@@ -17,6 +17,7 @@ import { WorkAssignment, WorkPriority, WorkStatus, WorkAudioAttachment } from '.
 import { createWorkAssignment, updateWorkAssignmentStatus, updateWorkAssignment } from '../../services/firestoreService';
 import { orderBy } from 'firebase/firestore';
 import { useActiveStaff } from '../../hooks/useActiveStaff';
+import { sendNotification } from '../../services/pushNotificationService';
 
 export const WorkAssignmentPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
@@ -126,6 +127,16 @@ export const WorkAssignmentPage: React.FC = () => {
 
       await createWorkAssignment(payload);
 
+      // Trigger Push Notification to assigned staff member
+      sendNotification({
+        recipientUserId: assignedTo,
+        title: 'New Work Assigned',
+        body: `"${title}" has been assigned to you.`,
+        url: '/work',
+        type: 'work_assigned',
+        metadata: { priority, deadlineDate, deadlineTime }
+      }).catch((err) => console.warn('[Notification Error]', err));
+
       setCreateModalOpen(false);
       resetForm();
       showToast('Work assignment dispatched with Cloudinary voice sync.', 'success');
@@ -184,6 +195,27 @@ export const WorkAssignmentPage: React.FC = () => {
     setSubmitting(true);
     try {
       await updateWorkAssignmentStatus(workId, newStatus, proof);
+
+      if (newStatus === 'submitted') {
+        sendNotification({
+          targetRole: 'director',
+          title: 'Work Task Submitted',
+          body: `${staffProfile?.fullName || userDoc?.name || 'Staff'} submitted task for approval.`,
+          url: '/work',
+          type: 'work_assigned',
+          metadata: { workId }
+        }).catch((err) => console.warn('[Notification Error]', err));
+      } else if (newStatus === 'completed' && selectedWork) {
+        sendNotification({
+          recipientUserId: selectedWork.assignedTo,
+          title: 'Task Approved & Completed',
+          body: `Your assigned task "${selectedWork.title}" has been approved and closed.`,
+          url: '/work',
+          type: 'work_assigned',
+          metadata: { workId }
+        }).catch((err) => console.warn('[Notification Error]', err));
+      }
+
       setSelectedWork(null);
       showToast(`Work status updated to ${newStatus.replace('_', ' ').toUpperCase()}.`, 'success');
     } catch (err) {

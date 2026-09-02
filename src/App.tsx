@@ -5,6 +5,9 @@ import { CompanyProvider } from './contexts/CompanyContext';
 import { SecurityProvider } from './contexts/SecurityContext';
 import { PWAProvider } from './contexts/PWAContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { PushNotificationProvider } from './contexts/PushNotificationContext';
+import { NotificationPermissionModal } from './components/common/NotificationPermissionModal';
+import { NotificationCenterModal } from './components/common/NotificationCenterModal';
 
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ProtectedRoute } from './components/security/ProtectedRoute';
@@ -56,10 +59,13 @@ export const App: React.FC = () => {
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <NotificationProvider>
           <AuthProvider>
-            <CompanyProvider>
-              <SecurityProvider>
-                <PWAProvider>
-                  <Routes>
+            <PushNotificationProvider>
+              <NotificationPermissionModal />
+              <NotificationCenterModal />
+              <CompanyProvider>
+                <SecurityProvider>
+                  <PWAProvider>
+                    <Routes>
                 {/* AUTH ROUTES */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/pending-approval" element={<PendingApprovalPage />} />
@@ -110,10 +116,11 @@ export const App: React.FC = () => {
                     </ProtectedRoute>
                   }
                 />
-                </Routes>
-              </PWAProvider>
-            </SecurityProvider>
-          </CompanyProvider>
+                  </Routes>
+                </PWAProvider>
+              </SecurityProvider>
+            </CompanyProvider>
+          </PushNotificationProvider>
         </AuthProvider>
       </NotificationProvider>
     </BrowserRouter>

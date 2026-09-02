@@ -13,6 +13,7 @@ import { GoogleMapsButton } from '../../../components/common/GoogleMapsButton';
 import { AttendanceRecord } from '../../../types';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
+import { sendNotification } from '../../../services/pushNotificationService';
 
 export const DutyCard: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
@@ -126,6 +127,16 @@ export const DutyCard: React.FC = () => {
       });
       showToast(isTodaySunday ? 'Sunday Duty ON recorded successfully.' : 'Duty ON recorded successfully.', 'success');
       setSundayModalOpen(false);
+
+      // Trigger Push Notification to Directors
+      sendNotification({
+        targetRole: 'director',
+        title: 'Janta Live Setu',
+        body: `${staffProfile?.fullName || userDoc.name || 'Staff Member'} started duty at ${timeStr}.`,
+        url: '/attendance',
+        type: 'attendance_on',
+        metadata: { userId: userDoc.uid, date: todayStr }
+      }).catch((err) => console.warn('[Notification Error]', err));
     } catch (err: any) {
       console.error('Duty On error:', err);
       const errorMsg = err.message || 'Failed to capture GPS location for Duty On.';
@@ -158,6 +169,16 @@ export const DutyCard: React.FC = () => {
 
       showToast(`Sunday Duty ON recorded! Leave of ${selectedLeaveDate} is now covered.`, 'success');
       setSundayModalOpen(false);
+
+      // Trigger Push Notification to Directors
+      sendNotification({
+        targetRole: 'director',
+        title: 'Janta Live Setu',
+        body: `${staffProfile?.fullName || userDoc.name || 'Staff Member'} started Sunday duty to cover leave of ${selectedLeaveDate}.`,
+        url: '/attendance',
+        type: 'attendance_on',
+        metadata: { userId: userDoc.uid, coveredLeaveDate: selectedLeaveDate }
+      }).catch((err) => console.warn('[Notification Error]', err));
     } catch (err: any) {
       console.error('Sunday Leave Cover error:', err);
       setError(err.message || 'Failed to cover leave.');
@@ -194,6 +215,16 @@ export const DutyCard: React.FC = () => {
 
       await recordDutyCheckOut(todayAttendance.id, timeStr, loc, totalMinutes);
       showToast('Duty OFF recorded successfully.', 'success');
+
+      // Trigger Push Notification to Directors
+      sendNotification({
+        targetRole: 'director',
+        title: 'Janta Live Setu',
+        body: `${staffProfile?.fullName || userDoc.name || 'Staff Member'} ended duty at ${timeStr}.`,
+        url: '/attendance',
+        type: 'attendance_off',
+        metadata: { userId: userDoc.uid, date: todayStr }
+      }).catch((err) => console.warn('[Notification Error]', err));
     } catch (err: any) {
       console.error('Duty Off error:', err);
       const isPermissionErr = err.code === 'permission-denied' || err.message?.includes('permission');

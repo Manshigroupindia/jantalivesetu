@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { ImageCropperModal } from '../../components/common/ImageCropperModal';
 import { DigitalIdCard } from '../../components/common/DigitalIdCard';
+import { NotificationSettingsCard } from '../../components/common/NotificationSettingsCard';
 import {
   User as UserIcon,
   Shield,
@@ -336,7 +337,8 @@ export const ProfilePage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* LEFT COL: PROFILE AVATAR CARD */}
-          <Card className="p-6 space-y-4 text-center">
+          <div className="space-y-6">
+            <Card className="p-6 space-y-4 text-center">
             <div className="relative inline-block mx-auto group">
               <img
                 src={activeAvatarSrc}
@@ -427,13 +429,15 @@ export const ProfilePage: React.FC = () => {
                     <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
                       READ-ONLY
                     </span>
-                  </div>
                 </div>
               </>
             )}
           </Card>
 
-          {/* RIGHT COL: DIRECTOR OR STAFF DETAILS FORM */}
+          <NotificationSettingsCard />
+        </div>
+
+        {/* RIGHT COL: DIRECTOR OR STAFF DETAILS FORM */}
           <Card className="p-6 space-y-6 lg:col-span-2">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">

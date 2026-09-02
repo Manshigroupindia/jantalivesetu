@@ -59,15 +59,14 @@ function createChunk(type, data) {
 }
 
 function crc32(buf) {
-  let crc = -1;
+  let crc = 0xffffffff;
   for (let i = 0; i < buf.length; i++) {
-    const byte = buf[i];
+    crc ^= buf[i];
     for (let j = 0; j < 8; j++) {
-      const bit = (crc ^ byte) & 1;
-      crc = (crc >>> 1) ^ (bit ? 0xedb88320 : 0);
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
     }
   }
-  return (crc ^ -1) >>> 0;
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 const publicDir = path.resolve(__dirname, '../public');

@@ -14,6 +14,7 @@ import { ArrowLeft, CheckCircle2, XCircle, FileText, Trash2, RefreshCw, AlertTri
 import { logAuditEvent } from '../../services/auditService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { sendNotification } from '../../services/pushNotificationService';
 
 export const StaffDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -89,6 +90,15 @@ export const StaffDetailPage: React.FC = () => {
 
         setStaff((prev) => (prev ? { ...prev, approvalStatus: 'approved' } : null));
         showToast('Staff profile approved & account activated successfully.', 'success');
+
+        // Trigger Push Notification to Staff
+        sendNotification({
+          recipientUserId: staff.userId,
+          title: 'Profile Approved',
+          body: 'Your Janta Live Setu staff profile has been approved.',
+          url: '/dashboard',
+          type: 'profile_approved'
+        }).catch((err) => console.warn('[Notification Error]', err));
       } catch (err: any) {
         showToast('Failed to approve staff profile.', 'error');
       } finally {
@@ -154,6 +164,15 @@ export const StaffDetailPage: React.FC = () => {
 
         setStaff((prev) => (prev ? { ...prev, approvalStatus: 'suspended' } : null));
         showToast('Staff profile suspended.', 'warning');
+
+        // Trigger Push Notification to Staff
+        sendNotification({
+          recipientUserId: staff.userId,
+          title: 'Account Suspended',
+          body: 'Your Janta Live Setu account has been suspended by Director.',
+          url: '/dashboard',
+          type: 'profile_suspended'
+        }).catch((err) => console.warn('[Notification Error]', err));
       } catch (err: any) {
         showToast('Failed to suspend staff.', 'error');
       } finally {
@@ -180,6 +199,15 @@ export const StaffDetailPage: React.FC = () => {
 
         setStaff((prev) => (prev ? { ...prev, approvalStatus: 'approved' } : null));
         showToast('Staff account reactivated successfully.', 'success');
+
+        // Trigger Push Notification to Staff
+        sendNotification({
+          recipientUserId: staff.userId,
+          title: 'Account Reactivated',
+          body: 'Your Janta Live Setu account has been reactivated.',
+          url: '/dashboard',
+          type: 'profile_approved'
+        }).catch((err) => console.warn('[Notification Error]', err));
       } catch (err: any) {
         showToast('Failed to reactivate staff account.', 'error');
       } finally {

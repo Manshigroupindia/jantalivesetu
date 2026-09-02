@@ -9,6 +9,7 @@ import { ChatMessage } from '../../types';
 import { sendChatMessage } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { sendNotification } from '../../services/pushNotificationService';
 import { orderBy, limit } from 'firebase/firestore';
 
 export const ChatPage: React.FC = () => {
@@ -50,6 +51,17 @@ export const ChatPage: React.FC = () => {
         channel: 'general',
         createdAt: new Date().toISOString(),
       });
+
+      // Trigger Push Notification based on role
+      const senderIsDirector = userDoc.role === 'director' || userDoc.role === 'Director';
+      sendNotification({
+        targetRole: senderIsDirector ? 'staff' : 'director',
+        title: senderIsDirector ? 'New Message from Director' : `New Message from ${staffProfile?.fullName || userDoc.name || 'Staff'}`,
+        body: text.trim() ? (text.trim().length > 60 ? `${text.trim().slice(0, 60)}...` : text.trim()) : 'Sent a voice/media message.',
+        url: '/chat',
+        type: 'chat_message',
+        metadata: { senderId: userDoc.uid }
+      }).catch((err) => console.warn('[Notification Error]', err));
 
       setText('');
       setVoiceUrl('');
