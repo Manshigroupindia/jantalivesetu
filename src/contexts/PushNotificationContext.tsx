@@ -7,8 +7,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  writeBatch,
-  getDocs
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -67,7 +66,7 @@ const PushNotificationContext = createContext<PushNotificationContextType>({
 });
 
 export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, userDoc } = useAuth();
+  const { firebaseUser: user, userDoc } = useAuth();
   const { showToast } = useNotification();
   const [permission, setPermission] = useState<PermissionStatus>(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -90,19 +89,24 @@ export const PushNotificationProvider: React.FC<{ children: React.ReactNode }> =
     const currentPerm = Notification.permission as PermissionStatus;
     setPermission(currentPerm);
 
+    let timer: NodeJS.Timeout | null = null;
+
     if (currentPerm === 'default') {
       const dismissed = localStorage.getItem(`fcm_prompt_dismissed_${user.uid}`);
       if (!dismissed) {
         // Delay slightly for smooth page load experience
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
           setIsPromptOpen(true);
         }, 2500);
-        return () => clearTimeout(timer);
       }
     } else if (currentPerm === 'granted') {
       // Auto-refresh token in Firestore
       registerPushToken(user.uid, userDoc?.role || 'staff');
     }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [user, userDoc?.role]);
 
   // Request Notification Permission

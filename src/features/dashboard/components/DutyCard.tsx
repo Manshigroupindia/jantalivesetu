@@ -132,10 +132,10 @@ export const DutyCard: React.FC = () => {
       sendNotification({
         targetRole: 'director',
         title: 'Janta Live Setu',
-        body: `${staffProfile?.fullName || userDoc.name || 'Staff Member'} started duty at ${timeStr}.`,
+        body: `${staffProfile?.fullName || userDoc?.name || 'Staff Member'} started duty at ${timeStr}.`,
         url: '/attendance',
         type: 'attendance_on',
-        metadata: { userId: userDoc.uid, date: todayStr }
+        metadata: { userId: userDoc?.uid || '', date: todayStr }
       }).catch((err) => console.warn('[Notification Error]', err));
     } catch (err: any) {
       console.error('Duty On error:', err);
@@ -174,10 +174,10 @@ export const DutyCard: React.FC = () => {
       sendNotification({
         targetRole: 'director',
         title: 'Janta Live Setu',
-        body: `${staffProfile?.fullName || userDoc.name || 'Staff Member'} started Sunday duty to cover leave of ${selectedLeaveDate}.`,
+        body: `${staffProfile?.fullName || userDoc?.name || 'Staff Member'} started Sunday duty to cover leave of ${selectedLeaveDate}.`,
         url: '/attendance',
         type: 'attendance_on',
-        metadata: { userId: userDoc.uid, coveredLeaveDate: selectedLeaveDate }
+        metadata: { userId: userDoc?.uid || '', coveredLeaveDate: selectedLeaveDate }
       }).catch((err) => console.warn('[Notification Error]', err));
     } catch (err: any) {
       console.error('Sunday Leave Cover error:', err);
@@ -220,10 +220,10 @@ export const DutyCard: React.FC = () => {
       sendNotification({
         targetRole: 'director',
         title: 'Janta Live Setu',
-        body: `${staffProfile?.fullName || userDoc.name || 'Staff Member'} ended duty at ${timeStr}.`,
+        body: `${staffProfile?.fullName || userDoc?.name || 'Staff Member'} ended duty at ${timeStr}.`,
         url: '/attendance',
         type: 'attendance_off',
-        metadata: { userId: userDoc.uid, date: todayStr }
+        metadata: { userId: userDoc?.uid || '', date: todayStr }
       }).catch((err) => console.warn('[Notification Error]', err));
     } catch (err: any) {
       console.error('Duty Off error:', err);

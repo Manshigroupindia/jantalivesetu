@@ -1,6 +1,6 @@
 import { getToken, onMessage } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
-import { collection, doc, setDoc, deleteDoc, serverTimestamp, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db, functions, getMessagingInstance, firebaseConfig } from '../config/firebase';
 
 export type NotificationType =

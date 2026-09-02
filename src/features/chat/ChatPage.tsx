@@ -9,11 +9,13 @@ import { ChatMessage } from '../../types';
 import { sendChatMessage } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import { sendNotification } from '../../services/pushNotificationService';
 import { orderBy, limit } from 'firebase/firestore';
 
 export const ChatPage: React.FC = () => {
   const { userDoc, staffProfile } = useAuth();
+  const { isDirector } = usePermissions();
   const { showToast } = useNotification();
   const [text, setText] = useState('');
   const [voiceUrl, setVoiceUrl] = useState('');
@@ -53,7 +55,7 @@ export const ChatPage: React.FC = () => {
       });
 
       // Trigger Push Notification based on role
-      const senderIsDirector = userDoc.role === 'director' || userDoc.role === 'Director';
+      const senderIsDirector = isDirector;
       sendNotification({
         targetRole: senderIsDirector ? 'staff' : 'director',
         title: senderIsDirector ? 'New Message from Director' : `New Message from ${staffProfile?.fullName || userDoc.name || 'Staff'}`,
