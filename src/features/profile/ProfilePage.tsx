@@ -429,6 +429,7 @@ export const ProfilePage: React.FC = () => {
                     <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
                       READ-ONLY
                     </span>
+                  </div>
                 </div>
               </>
             )}
