@@ -241,40 +241,42 @@ export function calculateSalaryBreakdown(
     } else if (fraction === 0.5) {
       halfDaysCount++;
       workedDaysUnits += 0.5;
+      unpaidLeaves += 0.5;
     } else if (attendance && attendance.status === 'paid_leave') {
       if (emergencyLeavesUsed < emergencyLeaveAllowed) {
         emergencyLeavesUsed++;
       } else {
-        unpaidLeaves++;
+        unpaidLeaves += 1;
       }
     } else if (isCompanyHoliday) {
       paidHolidays++;
     } else {
       // Absent on standard working day
-      unpaidLeaves++;
+      unpaidLeaves += 1;
     }
   }
 
   // Auto-apply 1 Emergency Leave if there are unpaid leaves and 0 explicit paid leaves were logged
   if (unpaidLeaves > 0 && emergencyLeavesUsed === 0 && emergencyLeaveAllowed > 0) {
-    emergencyLeavesUsed = 1;
-    unpaidLeaves -= 1;
+    const autoEmergency = Math.min(unpaidLeaves, emergencyLeaveAllowed);
+    emergencyLeavesUsed = autoEmergency;
+    unpaidLeaves -= autoEmergency;
   }
 
-  // Total paid days before cap
-  const totalPaidDaysUnits = workedDaysUnits + paidSundays + paidHolidays + emergencyLeavesUsed + coveredLeavesUnits;
+  // Authoritative SINGLE SOURCE OF TRUTH for unpaid leave / absent days
+  const unpaidLeaveAbsentDays = Math.max(0, unpaidLeaves);
 
-  // Cap total paid units at 30 days for 30-day salary basis
-  const cappedPaidUnits = Math.min(30, totalPaidDaysUnits);
+  // Exact salary deduction formula: unpaidLeaveAbsentDays * dailyRate (NO extra day added)
+  const salaryDeductionAmount = Math.round(unpaidLeaveAbsentDays * dailyRate);
+  const deductedDays = unpaidLeaveAbsentDays;
 
-  // Deducted days from 30-day standard basis
-  const deductedDays = Math.max(0, 30 - cappedPaidUnits);
-  const salaryDeductionAmount = Math.round(deductedDays * dailyRate);
+  // Total payable days units out of standard 30-day monthly basis
+  const totalPayableDaysUnits = Math.max(0, Math.min(30, Math.round((30 - unpaidLeaveAbsentDays) * 10) / 10));
 
-  let earnedSalary = Math.round(cappedPaidUnits * dailyRate);
+  // Base Earned Salary based on 30-day standard model
+  let earnedSalary = Math.round(totalPayableDaysUnits * dailyRate);
 
-  // If staff completed full attendance/payable units (30), set to exact monthly base salary
-  if (cappedPaidUnits >= 30) {
+  if (unpaidLeaveAbsentDays === 0) {
     earnedSalary = monthlySalary;
   } else if (deductedDays > 0) {
     earnedSalary = Math.max(0, monthlySalary - salaryDeductionAmount);
@@ -298,8 +300,8 @@ export function calculateSalaryBreakdown(
     paidSundays,
     paidHolidays,
     emergencyLeavesUsed,
-    unpaidLeaves,
-    deductedDays,
+    unpaidLeaves: unpaidLeaveAbsentDays,
+    deductedDays: unpaidLeaveAbsentDays,
     salaryDeductionAmount,
     earnedSalary,
     expenseReimbursements: approvedExpensesTotal,
@@ -327,8 +329,8 @@ export function calculateSalaryBreakdown(
     sundaysCount: paidSundays,
     paidHolidaysCount: paidHolidays,
     emergencyLeaveCount: emergencyLeavesUsed,
-    absentDays: deductedDays,
-    totalPayableDays: cappedPaidUnits,
+    absentDays: unpaidLeaveAbsentDays,
+    totalPayableDays: totalPayableDaysUnits,
     grossSalary,
     absentDeduction: salaryDeductionAmount,
     advanceDeduction,
