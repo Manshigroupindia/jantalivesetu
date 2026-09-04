@@ -173,7 +173,7 @@ describe('Janta Live Setu Central Salary Engine Tests', () => {
         checkOut: '06:30 PM',
         checkInLocation: { latitude: 28.6, longitude: 77.2, accuracy: 10, capturedAt: dateStr },
         totalMinutes: 540,
-        status: 'present',
+        status: 'present' as const,
         createdAt: dateStr,
         updatedAt: dateStr,
       });
@@ -212,10 +212,10 @@ describe('Janta Live Setu Central Salary Engine Tests', () => {
         checkOut: '06:30 PM',
         checkInLocation: { latitude: 0, longitude: 0, accuracy: 0, capturedAt: '' },
         totalMinutes: 540,
-        status: 'present',
+        status: 'present' as const,
         createdAt: '',
         updatedAt: '',
-      })).filter((att) => new Date(att.date).getDay() !== 0),
+      })).filter((att) => new Date(att.date).getDay() !== 0) as AttendanceRecord[],
       emergencyLeaveCount: 0,
     });
     expect(res15k.dailyRate).toBe(500);
@@ -234,10 +234,10 @@ describe('Janta Live Setu Central Salary Engine Tests', () => {
         checkOut: '06:30 PM',
         checkInLocation: { latitude: 0, longitude: 0, accuracy: 0, capturedAt: '' },
         totalMinutes: 540,
-        status: 'present',
+        status: 'present' as const,
         createdAt: '',
         updatedAt: '',
-      })).filter((att) => new Date(att.date).getDay() !== 0),
+      })).filter((att) => new Date(att.date).getDay() !== 0) as AttendanceRecord[],
       emergencyLeaveCount: 0,
     });
     expect(res12k.dailyRate).toBe(400);
@@ -256,10 +256,10 @@ describe('Janta Live Setu Central Salary Engine Tests', () => {
         checkOut: '06:30 PM',
         checkInLocation: { latitude: 0, longitude: 0, accuracy: 0, capturedAt: '' },
         totalMinutes: 540,
-        status: 'present',
+        status: 'present' as const,
         createdAt: '',
         updatedAt: '',
-      })).filter((att) => new Date(att.date).getDay() !== 0),
+      })).filter((att) => new Date(att.date).getDay() !== 0) as AttendanceRecord[],
       emergencyLeaveCount: 0,
     });
     expect(res30k.dailyRate).toBe(1000);
