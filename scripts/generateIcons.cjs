@@ -53,20 +53,9 @@ function createChunk(type, data) {
   buffer.writeUInt32BE(len, 0);
   buffer.write(type, 4, 4, 'ascii');
   data.copy(buffer, 8);
-  const crc = crc32(buffer.subarray(4, 8 + len));
+  const crc = zlib.crc32(buffer.subarray(4, 8 + len));
   buffer.writeUInt32BE(crc, 8 + len);
   return buffer;
-}
-
-function crc32(buf) {
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc ^= buf[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
 }
 
 const publicDir = path.resolve(__dirname, '../public');

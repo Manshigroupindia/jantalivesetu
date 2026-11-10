@@ -17,6 +17,7 @@ import {
   FileBarChart,
   Settings,
   FolderGit2,
+  MessageCircle,
   Lock,
   User,
   LucideIcon
@@ -153,6 +154,14 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
     path: '/clients',
     icon: FolderGit2,
     category: 'management',
+  },
+  {
+    id: 'campaigns',
+    label: 'WhatsApp Campaigns',
+    path: '/campaigns',
+    icon: MessageCircle,
+    category: 'management',
+    permission: 'campaigns.view',
   },
 
   // FACILITIES & CLEANING

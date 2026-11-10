@@ -59,7 +59,8 @@ describe('Janta Live Setu Central Salary Engine Tests', () => {
     for (let d = 1; d <= 30; d++) {
       const dateStr = `2026-08-${String(d).padStart(2, '0')}`;
       const isSunday = new Date(2026, 7, d).getDay() === 0;
-      if (!isSunday) {
+      // Leave on day 10 (working day)
+      if (!isSunday && d !== 10) {
         records.push({
           id: `att_${d}`,
           userId: 'user_123',

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getMessaging, isSupported, Messaging } from 'firebase/messaging';
 import { getFunctions } from 'firebase/functions';
 
@@ -19,7 +19,19 @@ export const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Enable auto-detect long polling so that browser tracking prevention or adblockers
+// that block Google WebChannel streaming channels fall back gracefully to long-polling
+let firestoreDb: ReturnType<typeof getFirestore>;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
+} catch {
+  firestoreDb = getFirestore(app);
+}
+export const db = firestoreDb;
+
 export const functions = getFunctions(app, "us-central1");
 
 let messagingInstance: Messaging | null = null;

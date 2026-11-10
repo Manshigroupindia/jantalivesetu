@@ -12,7 +12,8 @@ export type CloudinaryFolder =
   | 'janta-live-setu/electricity'
   | 'janta-live-setu/cleanliness'
   | 'janta-live-setu/rent'
-  | 'janta-live-setu/water';
+  | 'janta-live-setu/water'
+  | 'janta-live-setu/campaigns';
 
 export interface UploadProgressCallback {
   (progressPercent: number): void;

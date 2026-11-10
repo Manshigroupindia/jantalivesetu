@@ -35,6 +35,8 @@ export type PermissionKey =
   | 'settings.manage'
   | 'chat.use'
   | 'reports.view'
+  | 'campaigns.view'
+  | 'campaigns.manage'
   | 'sensitive.delete';
 
 const PERMISSION_MATRIX: Record<PermissionKey, UserRole[]> = {
@@ -72,6 +74,8 @@ const PERMISSION_MATRIX: Record<PermissionKey, UserRole[]> = {
   'settings.manage': ['director'],
   'chat.use': ['director', 'admin', 'staff'],
   'reports.view': ['director', 'admin'],
+  'campaigns.view': ['director', 'admin'],
+  'campaigns.manage': ['director', 'admin'],
   'sensitive.delete': ['director'],
 };
 

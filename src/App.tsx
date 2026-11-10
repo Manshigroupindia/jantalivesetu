@@ -41,6 +41,7 @@ import { HolidayCalendarPage } from './features/notices/HolidayCalendarPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { ClientDirectoryPage } from './features/clients/ClientDirectoryPage';
+import { WhatsAppCampaignsModule } from './features/campaigns/WhatsAppCampaignsModule';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { NotFoundPage } from './features/error/NotFoundPage';
@@ -107,6 +108,7 @@ export const App: React.FC = () => {
                           <Route path="reports" element={<ReportsPage />} />
                           <Route path="audit" element={<AuditLogsPage />} />
                           <Route path="clients" element={<ClientDirectoryPage />} />
+                          <Route path="campaigns/*" element={<WhatsAppCampaignsModule />} />
                           <Route path="settings" element={<SettingsPage />} />
 
                           <Route path="404" element={<NotFoundPage />} />

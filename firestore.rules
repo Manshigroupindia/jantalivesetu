@@ -42,6 +42,10 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (isOwner(userId) || isDirector() || isAdmin());
       allow update: if isDirector() || isAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'approved', 'status', 'monthlySalary', 'isSuspended']));
       allow delete: if isDirector();
+
+      match /notificationTokens/{tokenId} {
+        allow read, write: if isAuthenticated() && (isOwner(userId) || isDirector() || isAdmin());
+      }
     }
 
     // STAFF PROFILES
@@ -192,6 +196,14 @@ service cloud.firestore {
       allow delete: if isDirector();
     }
 
+    // NOTIFICATIONS
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (resource.data.recipientUserId == request.auth.uid || isDirector() || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.recipientUserId == request.auth.uid || isDirector() || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.recipientUserId == request.auth.uid || isDirector() || isAdmin());
+    }
+
     // HOLIDAYS
     match /holidays/{holidayId} {
       allow read: if isAuthenticated();
@@ -205,6 +217,49 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isApproved();
       allow update: if isAuthenticated() && isApproved();
+      allow delete: if isDirector() || isAdmin();
+    }
+
+    // CLIENT RECORDS
+    match /clientRecords/{recordId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isApproved();
+      allow update: if isAuthenticated() && isApproved();
+      allow delete: if isDirector() || isAdmin();
+    }
+
+    // CLIENT CATEGORIES
+    match /clientCategories/{catId} {
+      allow read: if isAuthenticated();
+      allow write: if isDirector() || isAdmin();
+    }
+
+    // CHAT MESSAGES
+    match /chatMessages/{msgId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isDirector() || isAdmin();
+    }
+
+    // WHATSAPP CAMPAIGNS
+    match /campaigns/{campaignId} {
+      allow read: if isAuthenticated();
+      allow create: if isDirector() || isAdmin();
+      allow update: if isDirector() || isAdmin();
+      allow delete: if isDirector();
+
+      match /batches/{batchId} {
+        allow read: if isAuthenticated();
+        allow write: if isDirector() || isAdmin();
+      }
+    }
+
+    // CAMPAIGN AUDIT LOGS
+    match /campaignLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if false;
       allow delete: if isDirector();
     }
 

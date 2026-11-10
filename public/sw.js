@@ -2,8 +2,10 @@
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'janta-live-setu-v6';
+const CACHE_NAME = 'janta-live-setu-v7';
 const STATIC_ASSETS = [
+  '/',
+  '/index.html',
   '/logo.svg',
   '/pwa-192.png',
   '/pwa-512.png',
@@ -83,11 +85,17 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Install Event - cache static assets
+// Install Event - cache static assets safely
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch(() => {});
+      return Promise.allSettled(
+        STATIC_ASSETS.map((asset) =>
+          cache.add(asset).catch((err) => {
+            console.warn('[sw.js] Failed to cache static asset during install:', asset, err);
+          })
+        )
+      );
     })
   );
   self.skipWaiting();
@@ -109,18 +117,43 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch Event - Network-First for HTML/JS/CSS to ensure fresh Vercel deployments are served
+// Fetch Event - Network-First for HTML/JS/CSS to ensure fresh deployments are served
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (!event.request.url.startsWith(self.location.origin)) return;
 
   const url = new URL(event.request.url);
 
-  // Navigation / HTML requests -> strictly Network-First
-  if (event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/') {
+  // Navigation / HTML / Document requests -> Network-First with safe SPA fallback
+  const isNavigation =
+    event.request.mode === 'navigate' ||
+    event.request.destination === 'document' ||
+    url.pathname.endsWith('.html') ||
+    url.pathname === '/' ||
+    Boolean(event.request.headers.get('accept')?.includes('text/html'));
+
+  if (isNavigation) {
     event.respondWith(
       fetch(event.request)
-        .catch(() => caches.match('/index.html') || caches.match('/'))
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          const indexHtml = await caches.match('/index.html');
+          if (indexHtml) return indexHtml;
+          const root = await caches.match('/');
+          if (root) return root;
+          return new Response(
+            '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Janta Live Setu</title></head><body><div id="root"></div></body></html>',
+            { status: 200, headers: { 'Content-Type': 'text/html' } }
+          );
+        })
     );
     return;
   }
@@ -136,7 +169,11 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          return new Response(null, { status: 404, statusText: 'Asset not found' });
+        })
     );
     return;
   }
@@ -145,13 +182,21 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const copy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
-        return networkResponse;
-      });
+      return fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          if (event.request.headers.get('accept')?.includes('text/html')) {
+            const indexHtml = await caches.match('/index.html');
+            if (indexHtml) return indexHtml;
+          }
+          return new Response(null, { status: 404, statusText: 'Resource unavailable' });
+        });
     })
   );
 });

@@ -479,3 +479,6 @@ export interface ClientRecord {
   createdById?: string;
   createdAt: string;
 }
+
+export * from './campaign';
+
