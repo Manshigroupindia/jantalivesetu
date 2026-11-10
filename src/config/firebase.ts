@@ -20,12 +20,12 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-// Enable auto-detect long polling so that browser tracking prevention or adblockers
-// that block Google WebChannel streaming channels fall back gracefully to long-polling
+// Force long-polling to prevent browser extensions (AdBlock, uBlock, Brave Shields)
+// and strict tracking prevention from blocking Google WebChannel streaming channels with net::ERR_BLOCKED_BY_CLIENT.
 let firestoreDb: ReturnType<typeof getFirestore>;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   });
 } catch {
   firestoreDb = getFirestore(app);

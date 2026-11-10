@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizePhone, generateVCard } from '../utils/phoneUtils';
 import { parseCSV, generateCSV, detectColumnMapping } from '../utils/csvUtils';
-import { splitIntoBroadcastBatches } from '../services/campaignService';
+import { splitIntoBroadcastBatches, cleanData } from '../services/campaignService';
 import { Client, CampaignBatch, CampaignStatus } from '../types/campaign';
 
 describe('WhatsApp Campaigns & Broadcast Preparation Module Tests', () => {
@@ -283,6 +283,94 @@ describe('WhatsApp Campaigns & Broadcast Preparation Module Tests', () => {
       const allSent2 = batches.every((b) => b.status === 'manually_sent');
       status = allSent2 ? 'manually_sent' : 'partially_sent';
       expect(status).toBe('manually_sent');
+    });
+  });
+
+  /* =========================================================================
+     7. FIRESTORE PAYLOAD SANITIZER (cleanData)
+     ========================================================================= */
+  describe('Firestore Payload Sanitizer (cleanData)', () => {
+    it('removes undefined fields at top level', () => {
+      const input = {
+        name: 'Festive Campaign',
+        notes: undefined,
+        status: 'prepared',
+      };
+      const cleaned = cleanData(input);
+      expect(cleaned).toEqual({
+        name: 'Festive Campaign',
+        status: 'prepared',
+      });
+      expect('notes' in cleaned).toBe(false);
+    });
+
+    it('recursively removes undefined fields inside nested objects', () => {
+      const input = {
+        campaign: {
+          title: 'Diwali',
+          meta: {
+            author: 'Admin',
+            deletedAt: undefined,
+          },
+        },
+      };
+      const cleaned = cleanData(input);
+      expect(cleaned).toEqual({
+        campaign: {
+          title: 'Diwali',
+          meta: {
+            author: 'Admin',
+          },
+        },
+      });
+      expect('deletedAt' in cleaned.campaign.meta).toBe(false);
+    });
+
+    it('recursively sanitizes array elements and objects inside arrays', () => {
+      const input = {
+        batches: [
+          {
+            batchNumber: 1,
+            recipients: [
+              { id: '1', name: 'Ramesh', company: undefined },
+              { id: '2', name: 'Suresh', company: 'Tech Corp' },
+            ],
+            manuallySentAt: undefined,
+          },
+        ],
+      };
+      const cleaned = cleanData(input);
+      expect(cleaned).toEqual({
+        batches: [
+          {
+            batchNumber: 1,
+            recipients: [
+              { id: '1', name: 'Ramesh' },
+              { id: '2', name: 'Suresh', company: 'Tech Corp' },
+            ],
+          },
+        ],
+      });
+      expect('company' in cleaned.batches[0].recipients[0]).toBe(false);
+      expect('manuallySentAt' in cleaned.batches[0]).toBe(false);
+    });
+
+    it('preserves null, booleans, empty strings, and numbers', () => {
+      const input = {
+        zero: 0,
+        emptyStr: '',
+        nullVal: null,
+        boolFalse: false,
+        undefVal: undefined,
+      };
+      const cleaned = cleanData(input);
+      expect(cleaned).toEqual({
+        zero: 0,
+        emptyStr: '',
+        nullVal: null,
+        boolFalse: false,
+      });
+      expect('undefVal' in cleaned).toBe(false);
     });
   });
 });

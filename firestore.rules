@@ -247,16 +247,16 @@ service cloud.firestore {
       allow delete: if isDirector() || isAdmin();
     }
 
-    // WHATSAPP CAMPAIGNS
+    // CAMPAIGNS (WHATSAPP & SMS)
     match /campaigns/{campaignId} {
       allow read: if isAuthenticated();
-      allow create: if isDirector() || isAdmin();
-      allow update: if isDirector() || isAdmin();
-      allow delete: if isDirector();
+      allow create: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
+      allow update: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
+      allow delete: if isDirector() || isAdmin();
 
       match /batches/{batchId} {
         allow read: if isAuthenticated();
-        allow write: if isDirector() || isAdmin();
+        allow write: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
       }
     }
 
@@ -265,7 +265,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if false;
-      allow delete: if isDirector();
+      allow delete: if isDirector() || isAdmin();
     }
 
     // AUDIT LOGS

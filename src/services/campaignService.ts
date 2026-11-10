@@ -25,18 +25,26 @@ import {
 } from '../types/campaign';
 import { normalizePhone } from '../utils/phoneUtils';
 
-// Helper to remove undefined fields recursively
-function cleanData<T extends Record<string, any>>(obj: T): T {
-  const clean: Record<string, any> = Array.isArray(obj) ? [] : {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) continue;
-    if (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-      clean[key] = cleanData(value);
-    } else {
-      clean[key] = value;
-    }
+// Helper to recursively remove all undefined fields and undefined array elements
+export function cleanData<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
   }
-  return clean as T;
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => cleanData(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const clean: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        clean[key] = cleanData(value);
+      }
+    }
+    return clean as T;
+  }
+  return obj;
 }
 
 /* =========================================================================
@@ -307,13 +315,24 @@ export function splitIntoBroadcastBatches(
       id: `batch_${batchNumber}`,
       batchNumber,
       recipientIds: chunk.map((c) => c.id),
-      recipients: chunk.map((c) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        normalizedPhone: c.normalizedPhone,
-        company: c.company,
-      })),
+      recipients: chunk.map((c) => {
+        const item: {
+          id: string;
+          name: string;
+          phone: string;
+          normalizedPhone: string;
+          company?: string;
+        } = {
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          normalizedPhone: c.normalizedPhone || c.phone,
+        };
+        if (c.company) {
+          item.company = c.company;
+        }
+        return item;
+      }),
       recipientCount: chunk.length,
       status: 'prepared',
       preparedAt: new Date().toISOString(),
@@ -381,22 +400,34 @@ export async function createCampaign(
     updatedAt: now,
   };
 
-  const docRef = await addDoc(collection(db, 'campaigns'), cleanData(payload));
+  const cleanedPayload = cleanData(payload);
+
+  let docRef;
+  try {
+    docRef = await addDoc(collection(db, 'campaigns'), cleanedPayload);
+  } catch (err: any) {
+    console.error('[CampaignService] Error creating campaign in Firestore:', err);
+    throw new Error(err?.message || 'Failed to save campaign to Firestore database.');
+  }
 
   const methodLabel = deliveryMethod === 'sms' ? 'SMS Messages' : 'WhatsApp Broadcast';
 
-  // Log creation activity
-  await logCampaignActivity({
-    campaignId: docRef.id,
-    action: payload.status === 'draft' ? 'draft_saved' : 'prepared',
-    description:
-      payload.status === 'draft'
-        ? `${methodLabel} Campaign "${payload.campaignName}" saved as draft.`
-        : `${methodLabel} Campaign "${payload.campaignName}" prepared with ${eligibleClients.length} recipients across ${batches.length} batches.`,
-    performedBy: userId || '',
-    performedByName: userName || 'Admin',
-    timestamp: now,
-  });
+  // Log creation activity (safe, non-blocking)
+  try {
+    await logCampaignActivity({
+      campaignId: docRef.id,
+      action: payload.status === 'draft' ? 'draft_saved' : 'prepared',
+      description:
+        payload.status === 'draft'
+          ? `${methodLabel} Campaign "${payload.campaignName}" saved as draft.`
+          : `${methodLabel} Campaign "${payload.campaignName}" prepared with ${eligibleClients.length} recipients across ${batches.length} batches.`,
+      performedBy: userId || '',
+      performedByName: userName || 'Admin',
+      timestamp: now,
+    });
+  } catch (logErr) {
+    console.warn('[CampaignService] Non-blocking warning: failed to log campaign activity:', logErr);
+  }
 
   return docRef.id;
 }
