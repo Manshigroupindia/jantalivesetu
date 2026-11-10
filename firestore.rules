@@ -15,16 +15,20 @@ service cloud.firestore {
       return isAuthenticated() && (
         (request.auth.token.email != null && request.auth.token.email.matches('(?i)devenjhaofficial@gmail.com')) || 
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          ('role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) &&
           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'director' ||
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Director'))
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Director' ||
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'DIRECTOR'))
       );
     }
     
     function isAdmin() {
       return isAuthenticated() && (
         isDirector() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          ('role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) &&
           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'))
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' ||
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN'))
       );
     }
     
@@ -236,7 +240,8 @@ service cloud.firestore {
     // CLIENT CATEGORIES
     match /clientCategories/{catId} {
       allow read: if isAuthenticated();
-      allow write: if isDirector() || isAdmin();
+      allow create, update: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
+      allow delete: if isDirector() || isAdmin();
     }
 
     // CHAT MESSAGES

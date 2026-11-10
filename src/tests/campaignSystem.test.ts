@@ -372,5 +372,71 @@ describe('WhatsApp Campaigns & Broadcast Preparation Module Tests', () => {
       });
       expect('undefVal' in cleaned).toBe(false);
     });
+
+    it('sanitizes a full campaign creation payload ensuring zero undefined fields anywhere in the document', () => {
+      const rawClients: Client[] = [
+        {
+          id: 'c1',
+          name: 'Client Without Company',
+          phone: '9876543210',
+          normalizedPhone: '+919876543210',
+          category: 'Corporate',
+          whatsappConsent: true,
+          status: 'active',
+          company: undefined, // no company
+          notes: undefined,
+          email: undefined,
+          createdAt: '2026-11-10T00:00:00.000Z',
+          updatedAt: '2026-11-10T00:00:00.000Z',
+        },
+      ];
+
+      const batches = splitIntoBroadcastBatches(rawClients, 10);
+
+      const campaignPayload = {
+        campaignName: 'Test SMS Campaign',
+        campaignType: 'Festival Wishes',
+        deliveryMethod: 'sms',
+        batchSize: 10,
+        description: 'Happy Diwali',
+        imageUrl: undefined, // omitted image
+        imagePublicId: undefined,
+        message: 'Dear client, happy diwali!',
+        websiteUrl: undefined,
+        contactDetails: undefined,
+        audienceType: 'all',
+        selectedCategories: ['Corporate'],
+        selectedClientIds: ['c1'],
+        totalSelected: 1,
+        totalExcluded: 0,
+        totalEligible: 1,
+        totalBatches: batches.length,
+        batches,
+        status: 'prepared',
+        smsMetadata: undefined,
+        createdBy: 'user_123',
+        createdByName: 'Admin',
+        createdAt: '2026-11-10T00:00:00.000Z',
+        updatedAt: '2026-11-10T00:00:00.000Z',
+      };
+
+      const sanitized = cleanData(campaignPayload);
+
+      // Verify no top-level undefined fields
+      expect('imageUrl' in sanitized).toBe(false);
+      expect('imagePublicId' in sanitized).toBe(false);
+      expect('websiteUrl' in sanitized).toBe(false);
+      expect('contactDetails' in sanitized).toBe(false);
+      expect('smsMetadata' in sanitized).toBe(false);
+
+      // Verify nested batch recipient has no undefined
+      const recipient = sanitized.batches[0].recipients[0];
+      expect(recipient.name).toBe('Client Without Company');
+      expect('company' in recipient).toBe(false);
+
+      // Deep inspection: verify JSON serialization produces clean object
+      const jsonStr = JSON.stringify(sanitized);
+      expect(jsonStr).not.toContain('undefined');
+    });
   });
 });
