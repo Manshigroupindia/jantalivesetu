@@ -366,6 +366,8 @@ export interface SalaryCalculationResult {
   fifthSundayCount?: number;
   isFifthSundayNeutral?: boolean;
   has31stNeutralDay?: boolean;
+  has31stPresentCredit?: boolean;
+  day31PresentCredit?: number;
   neutralDaysCount?: number;
 
   workedSundaysCount?: number;
@@ -449,7 +451,10 @@ export interface CompanyHoliday {
   type?: 'national' | 'festival' | 'company';
   isPaid?: boolean;
   description?: string;
+  createdBy?: string;
+  createdByName?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AuditLog {

@@ -221,9 +221,9 @@ service cloud.firestore {
     // HOLIDAYS
     match /holidays/{holidayId} {
       allow read: if isAuthenticated();
-      allow create: if isDirector();
-      allow update: if isDirector();
-      allow delete: if isDirector();
+      allow create: if isDirector() || isAdmin();
+      allow update: if isDirector() || isAdmin();
+      allow delete: if isDirector() || isAdmin();
     }
 
     // CLIENTS

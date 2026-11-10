@@ -1,5 +1,5 @@
 import { SalaryCalculationResult, AttendanceRecord, CompanyHoliday } from '../types';
-import { isHalfDayCheckIn } from '../utils/dateUtils';
+import { isHalfDayCheckIn, getCurrentMonthISO } from '../utils/dateUtils';
 
 export interface SalaryInputData {
   userId?: string;
@@ -80,8 +80,9 @@ export function calculateSalaryBreakdown(
   advanceDeductionParam: number = 0,
   approvedExpensesParam: number = 0
 ): SalaryCalculationResult {
+  const defaultMonth = getCurrentMonthISO();
   let userId = 'user_default';
-  let month = '2026-08';
+  let month = defaultMonth;
   let monthlySalary = 0;
   let attendanceRecords: AttendanceRecord[] = [];
   let holidays: (CompanyHoliday | string)[] = [];
@@ -92,7 +93,7 @@ export function calculateSalaryBreakdown(
   if (typeof monthlySalaryOrInput === 'object' && monthlySalaryOrInput !== null) {
     const input = monthlySalaryOrInput;
     userId = input.userId || 'user_default';
-    month = input.month || '2026-08';
+    month = input.month || defaultMonth;
     monthlySalary = input.monthlySalary || 0;
     attendanceRecords = input.attendanceRecords || [];
     holidays = input.holidays || [];
@@ -101,7 +102,7 @@ export function calculateSalaryBreakdown(
     advanceDeduction = input.advanceDeduction || 0;
   } else {
     monthlySalary = Number(monthlySalaryOrInput) || 0;
-    month = monthParam || '2026-08';
+    month = monthParam || defaultMonth;
     attendanceRecords = attendanceRecordsParam || [];
     holidays = holidaysParam || [];
     emergencyLeaveAllowed = emergencyLeaveParam || 1;
@@ -162,7 +163,11 @@ export function calculateSalaryBreakdown(
       if (typeof h === 'string') {
         if (h.startsWith(month)) holidaySet.add(h);
       } else if (h && h.date) {
-        if (h.date.startsWith(month)) holidaySet.add(h.date);
+        // Respect paid/unpaid status: only paid holidays are added to paid holiday set
+        const isPaid = h.isPaid !== false;
+        if (isPaid && h.date.startsWith(month)) {
+          holidaySet.add(h.date);
+        }
       }
     });
   }
@@ -179,22 +184,15 @@ export function calculateSalaryBreakdown(
   let emergencyLeavesUsed = 0;
   let unpaidLeaves = 0;
   let neutralDaysCount = 0;
-  let has31stNeutralDay = false;
   let coveredLeavesUnits = 0;
 
-  for (let day = 1; day <= daysInMonth; day++) {
+  // Process standard 30-day monthly calendar basis (days 1 to Math.min(30, daysInMonth))
+  for (let day = 1; day <= Math.min(30, daysInMonth); day++) {
     const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isPaidSunday = paidSundaySet.has(dateStr);
     const isFifthSunday = fifthSundaySet.has(dateStr);
     const isCompanyHoliday = holidaySet.has(dateStr);
     const attendance = attendanceMap.get(dateStr);
-
-    // Rule for 31st Calendar Day: Neutral (0 pay addition, 0 deduction)
-    if (day === 31) {
-      has31stNeutralDay = true;
-      neutralDaysCount++;
-      continue;
-    }
 
     // Process Sunday
     if (dateStr && (new Date(year, monthIdx, day).getDay() === 0)) {
@@ -266,20 +264,79 @@ export function calculateSalaryBreakdown(
   // Authoritative SINGLE SOURCE OF TRUTH for unpaid leave / absent days
   const unpaidLeaveAbsentDays = Math.max(0, unpaidLeaves);
 
+  // 31st Calendar Day Handling:
+  // NEW RULE: If month contains 31 days, and employee has MORE THAN 5 unpaid leave/absent days (>5),
+  // and employee was actually marked PRESENT on the 31st date, then 31st attendance is counted in Present Days.
+  // Otherwise, 31st remains neutral (0 pay addition, 0 deduction).
+  let has31stNeutralDay = false;
+  let has31stPresentCredit = false;
+  let day31PresentCredit = 0;
+
+  if (daysInMonth === 31) {
+    const dateStr31 = `${year}-${String(monthIdx + 1).padStart(2, '0')}-31`;
+    const is31Sunday = (new Date(year, monthIdx, 31).getDay() === 0);
+
+    if (is31Sunday) {
+      // 31st is a 5th Sunday: follows Sunday rules
+      has31stNeutralDay = true;
+      neutralDaysCount++;
+      const attendance31 = attendanceMap.get(dateStr31);
+      if (attendance31) {
+        const isWorkedSunday =
+          attendance31.workType === 'SUNDAY_WORK' ||
+          attendance31.workType === 'LEAVE_COVER' ||
+          attendance31.isSundayWorked === true ||
+          Boolean(attendance31.checkIn);
+
+        if (isWorkedSunday) {
+          workedSundaysCount++;
+          if (attendance31.workType === 'LEAVE_COVER' || attendance31.isLeaveCover) {
+            sundayLeaveCoverCount++;
+          } else {
+            const isHalf = attendance31.checkIn ? isHalfDayCheckIn(attendance31.checkIn) : (attendance31.payableFraction === 0.5);
+            const multiplier = isHalf ? 0.5 : 1.0;
+            sundayWorkPayTotal += Math.round(multiplier * dailyRate);
+          }
+        }
+      }
+    } else {
+      // 31st is a non-Sunday working date
+      const attendance31 = attendanceMap.get(dateStr31);
+      const { fraction: fraction31 } = getAttendanceStatusAndFraction(attendance31);
+
+      // Apply special 31st-day rule only when unpaid leave/absent days are MORE THAN 5 (>5) and present
+      if (unpaidLeaveAbsentDays > 5 && fraction31 > 0) {
+        has31stPresentCredit = true;
+        day31PresentCredit = fraction31;
+        if (fraction31 === 1) {
+          fullDaysCount++;
+          workedDaysUnits += 1;
+        } else if (fraction31 === 0.5) {
+          halfDaysCount++;
+          workedDaysUnits += 0.5;
+        }
+      } else {
+        // Neutral day: 0 pay addition, 0 deduction
+        has31stNeutralDay = true;
+        neutralDaysCount++;
+      }
+    }
+  }
+
   // Exact salary deduction formula: unpaidLeaveAbsentDays * dailyRate (NO extra day added)
   const salaryDeductionAmount = Math.round(unpaidLeaveAbsentDays * dailyRate);
-  const deductedDays = unpaidLeaveAbsentDays;
 
-  // Total payable days units out of standard 30-day monthly basis
-  const totalPayableDaysUnits = Math.max(0, Math.min(30, Math.round((30 - unpaidLeaveAbsentDays) * 10) / 10));
+  // Total payable days units out of standard 30-day monthly basis (capped at 30)
+  const totalPayableDaysUnits = Math.max(
+    0,
+    Math.min(30, Math.round((30 - unpaidLeaveAbsentDays + day31PresentCredit) * 10) / 10)
+  );
 
   // Base Earned Salary based on 30-day standard model
   let earnedSalary = Math.round(totalPayableDaysUnits * dailyRate);
 
-  if (unpaidLeaveAbsentDays === 0) {
+  if (totalPayableDaysUnits === 30 && unpaidLeaveAbsentDays === 0) {
     earnedSalary = monthlySalary;
-  } else if (deductedDays > 0) {
-    earnedSalary = Math.max(0, monthlySalary - salaryDeductionAmount);
   }
 
   // Gross Salary includes Base Earned Salary PLUS Sunday Work Bonus Pay!
@@ -310,6 +367,8 @@ export function calculateSalaryBreakdown(
     fifthSundayCount,
     isFifthSundayNeutral,
     has31stNeutralDay,
+    has31stPresentCredit,
+    day31PresentCredit,
     neutralDaysCount,
 
     workedSundaysCount,

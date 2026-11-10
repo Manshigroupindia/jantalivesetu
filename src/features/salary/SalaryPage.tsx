@@ -10,7 +10,7 @@ import { calculateSalaryBreakdown } from '../../services/salaryCalculator';
 import { useRealtimeCollection } from '../../hooks/useRealtime';
 import { AttendanceRecord, CompanyHoliday } from '../../types';
 import { formatINR } from '../../utils/formatters';
-import { formatMonthYear } from '../../utils/dateUtils';
+import { formatMonthYear, getCurrentMonthISO } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -27,7 +27,7 @@ export const SalaryPage: React.FC = () => {
   const { requirePinVerification } = useSecurity();
   const { showToast } = useNotification();
 
-  const [selectedMonth, setSelectedMonth] = useState('2026-08');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => getCurrentMonthISO());
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [breakdown, setBreakdown] = useState<any>(null);
 
@@ -311,6 +311,13 @@ export const SalaryPage: React.FC = () => {
                 <div className="flex justify-between p-2 rounded-lg bg-blue-50 text-blue-900 border border-blue-200 font-semibold">
                   <span>31st Calendar Day — Neutral (30-Day Model):</span>
                   <span>1 day</span>
+                </div>
+              )}
+
+              {Boolean(breakdown.has31stPresentCredit) && (
+                <div className="flex justify-between p-2 rounded-lg bg-teal-50 text-teal-900 border border-teal-200 font-semibold">
+                  <span>31st Calendar Day Present Credit (&gt; 5 Absences):</span>
+                  <span className="font-bold text-teal-800">+{breakdown.day31PresentCredit} day</span>
                 </div>
               )}
 

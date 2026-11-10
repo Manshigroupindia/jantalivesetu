@@ -1084,6 +1084,14 @@ export async function createCompanyHoliday(holiday: Omit<CompanyHoliday, 'id'>):
   return docRef.id;
 }
 
+export async function updateCompanyHoliday(id: string, updates: Partial<CompanyHoliday>): Promise<void> {
+  const docRef = doc(db, 'holidays', id);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export async function deleteCompanyHoliday(id: string): Promise<void> {
   const docRef = doc(db, 'holidays', id);
   await deleteDoc(docRef);

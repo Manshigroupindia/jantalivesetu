@@ -268,4 +268,230 @@ describe('Janta Live Setu Central Salary Engine Tests', () => {
     expect(res30k.salaryDeductionAmount).toBe(0);
     expect(res30k.earnedSalary).toBe(30000);
   });
+
+  it('Scenario A: 31-day month, > 5 absent days, present on 31st yields exactly 23 / 30 payable days', () => {
+    // 31-day month with 4 Sundays (July 2026 has 31 days, 4 Sundays: July 5, 12, 19, 26).
+    // 27 working days:
+    // - 17 Present (16 working days from July 1 to July 30, plus July 31 Present)
+    // - 8 Absent
+    // - 1 Paid Company Holiday (July 15)
+    // - 1 Paid Emergency Holiday
+    // Total calendar days: 17 + 8 + 1 + 1 + 4 = 31 days.
+    const presentDates = [
+      '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04',
+      '2026-07-06', '2026-07-07', '2026-07-08', '2026-07-09',
+      '2026-07-10', '2026-07-11', '2026-07-13', '2026-07-14',
+      '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-20',
+      '2026-07-31' // 31st date Present! (17th present day)
+    ];
+
+    const records: AttendanceRecord[] = presentDates.map((dateStr, idx) => ({
+      id: `att_a_${idx}`,
+      userId: 'user_scenario_a',
+      userName: 'Employee A',
+      userDesignation: 'Staff',
+      date: dateStr,
+      checkIn: '09:30 AM',
+      checkOut: '06:30 PM',
+      checkInLocation: { latitude: 28.6, longitude: 77.2, accuracy: 10, capturedAt: dateStr },
+      totalMinutes: 540,
+      status: 'present' as const,
+      createdAt: dateStr,
+      updatedAt: dateStr,
+    }));
+
+    const result = calculateSalaryBreakdown({
+      userId: 'user_scenario_a',
+      month: '2026-07',
+      monthlySalary: 12000, // Daily rate = 400
+      attendanceRecords: records,
+      holidays: [
+        { id: 'h_jul15', holidayName: 'Company Day', date: '2026-07-15', isPaid: true, type: 'company', createdAt: '2026-07-01' }
+      ],
+      emergencyLeaveCount: 1, // 1 emergency leave allowed
+    });
+
+    // Verify Breakdown matches user requirement table exactly:
+    expect(result.presentDays).toBe(17);
+    expect(result.fullDaysCount).toBe(17);
+    expect(result.absentDays).toBe(8);
+    expect(result.unpaidLeaves).toBe(8);
+    expect(result.sundaysCount).toBe(4);
+    expect(result.paidSundays).toBe(4);
+    expect(result.paidHolidaysCount).toBe(1);
+    expect(result.paidHolidays).toBe(1);
+    expect(result.emergencyLeaveCount).toBe(1);
+    expect(result.emergencyLeavesUsed).toBe(1);
+
+    // Total Payable Days: 17 + 4 + 1 + 1 = 23 / 30
+    expect(result.totalPayableDays).toBe(23);
+
+    // Earned salary: 23 * 400 = 9,200
+    expect(result.dailyRate).toBe(400);
+    expect(result.earnedSalary).toBe(9200);
+    expect(result.netSalary).toBe(9200);
+
+    // 31st day flags
+    expect(result.has31stPresentCredit).toBe(true);
+    expect(result.day31PresentCredit).toBe(1);
+    expect(result.has31stNeutralDay).toBe(false);
+  });
+
+  it('Scenario B: 31-day month, 5 or fewer absent days, 31st remains neutral', () => {
+    // 3 absent days, 21 present days (including 31st), 4 sundays, 1 holiday, 1 emergency leave.
+    // Because absent <= 5, the 31st date must remain neutral!
+    const presentDates = [
+      '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04',
+      '2026-07-06', '2026-07-07', '2026-07-08', '2026-07-09',
+      '2026-07-10', '2026-07-11', '2026-07-13', '2026-07-14',
+      '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-20',
+      '2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24',
+      '2026-07-31' // 31st date
+    ];
+
+    const records: AttendanceRecord[] = presentDates.map((dateStr, idx) => ({
+      id: `att_b_${idx}`,
+      userId: 'user_scenario_b',
+      userName: 'Employee B',
+      userDesignation: 'Staff',
+      date: dateStr,
+      checkIn: '09:30 AM',
+      checkOut: '06:30 PM',
+      checkInLocation: { latitude: 28.6, longitude: 77.2, accuracy: 10, capturedAt: dateStr },
+      totalMinutes: 540,
+      status: 'present' as const,
+      createdAt: dateStr,
+      updatedAt: dateStr,
+    }));
+
+    const result = calculateSalaryBreakdown({
+      userId: 'user_scenario_b',
+      month: '2026-07',
+      monthlySalary: 12000,
+      attendanceRecords: records,
+      holidays: [
+        { id: 'h_jul15', holidayName: 'Company Day', date: '2026-07-15', isPaid: true, type: 'company', createdAt: '2026-07-01' }
+      ],
+      emergencyLeaveCount: 1,
+    });
+
+    expect(result.absentDays).toBeLessThanOrEqual(5);
+    expect(result.has31stNeutralDay).toBe(true);
+    expect(result.has31stPresentCredit).toBe(false);
+  });
+
+  it('Scenario C: 31-day month, > 5 absent days, but employee ABSENT on 31st', () => {
+    // 8 absent days, 16 present days (July 31 is absent / omitted)
+    const presentDates = [
+      '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04',
+      '2026-07-06', '2026-07-07', '2026-07-08', '2026-07-09',
+      '2026-07-10', '2026-07-11', '2026-07-13', '2026-07-14',
+      '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-20'
+      // 31st omitted (absent)
+    ];
+
+    const records: AttendanceRecord[] = presentDates.map((dateStr, idx) => ({
+      id: `att_c_${idx}`,
+      userId: 'user_scenario_c',
+      userName: 'Employee C',
+      userDesignation: 'Staff',
+      date: dateStr,
+      checkIn: '09:30 AM',
+      checkOut: '06:30 PM',
+      checkInLocation: { latitude: 28.6, longitude: 77.2, accuracy: 10, capturedAt: dateStr },
+      totalMinutes: 540,
+      status: 'present' as const,
+      createdAt: dateStr,
+      updatedAt: dateStr,
+    }));
+
+    const result = calculateSalaryBreakdown({
+      userId: 'user_scenario_c',
+      month: '2026-07',
+      monthlySalary: 12000,
+      attendanceRecords: records,
+      holidays: [
+        { id: 'h_jul15', holidayName: 'Company Day', date: '2026-07-15', isPaid: true, type: 'company', createdAt: '2026-07-01' }
+      ],
+      emergencyLeaveCount: 1,
+    });
+
+    // July 31 is absent, so it must NOT count as present, and must remain neutral without extra deduction
+    expect(result.presentDays).toBe(16);
+    expect(result.absentDays).toBe(8);
+    expect(result.totalPayableDays).toBe(22);
+    expect(result.has31stNeutralDay).toBe(true);
+    expect(result.has31stPresentCredit).toBe(false);
+  });
+
+  it('Scenario D: Unpaid holiday (isPaid: false) is not credited as paid holiday in salary', () => {
+    const result = calculateSalaryBreakdown({
+      userId: 'user_unpaid_holiday',
+      month: '2026-08',
+      monthlySalary: 15000,
+      attendanceRecords: [],
+      holidays: [
+        { id: 'h_unpaid', holidayName: 'Unpaid Observance', date: '2026-08-14', isPaid: false, type: 'company', createdAt: '2026-08-01' },
+        { id: 'h_paid', holidayName: 'Independence Day', date: '2026-08-15', isPaid: true, type: 'national', createdAt: '2026-08-01' }
+      ],
+      emergencyLeaveCount: 0,
+    });
+
+    // Only the paid holiday should be counted in paidHolidaysCount
+    expect(result.paidHolidaysCount).toBe(1);
+  });
+
+  it('Scenario E: August 2026 — 31st Day Attendance counts as Present when absent days > 5', () => {
+    // August 2026: 25 working days in days 1..30.
+    // 15 present days (days 1..30) + 1 on Aug 31 = 16 present (or 16 on days 1..30 + 1 on Aug 31 = 17 present).
+    // Let employee have 7 absent days on days 1..30 (> 5 absent days).
+    const presentDates = [
+      '2026-08-01',
+      '2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08',
+      '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13',
+      '2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21',
+      '2026-08-31' // Present on 31st
+    ];
+
+    const records: AttendanceRecord[] = presentDates.map((dateStr, idx) => ({
+      id: `att_e_${idx}`,
+      userId: 'user_scenario_e',
+      userName: 'Employee E',
+      userDesignation: 'Staff',
+      date: dateStr,
+      checkIn: '09:30 AM',
+      checkOut: '06:30 PM',
+      checkInLocation: { latitude: 28.6, longitude: 77.2, accuracy: 10, capturedAt: dateStr },
+      totalMinutes: 540,
+      status: 'present' as const,
+      createdAt: dateStr,
+      updatedAt: dateStr,
+    }));
+
+    const result = calculateSalaryBreakdown({
+      userId: 'user_scenario_e',
+      month: '2026-08',
+      monthlySalary: 12000,
+      attendanceRecords: records,
+      holidays: [
+        { id: 'h_aug15', holidayName: 'Independence Day', date: '2026-08-15', isPaid: true, type: 'national', createdAt: '2026-08-01' }
+      ],
+      emergencyLeaveCount: 1,
+    });
+
+    // Absent days: 25 working days - 16 worked (days 1..30) - 1 holiday = 8 days.
+    // 8 days - 1 emergency leave = 7 absent days.
+    expect(result.absentDays).toBe(7);
+    expect(result.absentDays).toBeGreaterThan(5);
+
+    // Because absent days (7) > 5 and Aug 31 is present:
+    // 31st is credited: 16 (days 1..30) + 1 (Aug 31) = 17 Present days!
+    expect(result.presentDays).toBe(17);
+    expect(result.has31stPresentCredit).toBe(true);
+    expect(result.day31PresentCredit).toBe(1);
+
+    // Total payable days: 30 - 7 + 1 = 24 / 30
+    expect(result.totalPayableDays).toBe(24);
+    expect(result.earnedSalary).toBe(24 * 400);
+  });
 });
