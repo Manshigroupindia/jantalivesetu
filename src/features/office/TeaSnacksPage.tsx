@@ -181,11 +181,11 @@ export const TeaSnacksPage: React.FC = () => {
         unitPrice: safeUnitPrice,
         amount: safeUnitPrice,
         totalPrice,
-        loggedById: userDoc.uid,
-        loggedByUserId: userDoc.uid,
+        loggedById: userDoc.uid || '',
+        loggedByUserId: userDoc.uid || '',
         loggedByName: staffProfile?.fullName || userDoc.name || 'Staff',
         loggedByUserName: staffProfile?.fullName || userDoc.name || 'Staff',
-        notes: notes.trim() || undefined,
+        notes: (notes || '').trim(),
         createdAt: new Date().toISOString(),
       };
 
@@ -238,16 +238,16 @@ export const TeaSnacksPage: React.FC = () => {
         unitPrice: safeEditUnitPrice,
         amount: safeEditUnitPrice,
         totalPrice: editTotalPrice,
-        notes: editNotes.trim() || undefined,
-        updatedById: userDoc.uid,
+        notes: (editNotes || '').trim(),
+        updatedById: userDoc.uid || '',
         updatedByName: staffProfile?.fullName || userDoc.name || 'Staff',
         updateReason: editReason.trim(),
         previousValues: {
-          itemType: editingLog.itemType || editingLog.type,
-          quantity: editingLog.quantity || editingLog.count,
-          unitPrice: editingLog.unitPrice || editingLog.amount,
-          totalPrice: editingLog.totalPrice || editingLog.amount,
-          notes: editingLog.notes,
+          itemType: editingLog.itemType || editingLog.type || 'tea',
+          quantity: editingLog.quantity || editingLog.count || 1,
+          unitPrice: editingLog.unitPrice || editingLog.amount || 0,
+          totalPrice: editingLog.totalPrice !== undefined ? editingLog.totalPrice : (editingLog.amount !== undefined ? editingLog.amount : 0),
+          notes: editingLog.notes || '',
         },
       };
 

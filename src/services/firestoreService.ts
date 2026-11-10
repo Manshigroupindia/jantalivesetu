@@ -916,6 +916,22 @@ export async function updateExpenseStatus(
   await updateDoc(docRef, updates);
 }
 
+// Helper to recursively strip undefined properties for Firestore safe writes
+function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+  const clean: Record<string, any> = Array.isArray(obj) ? [] : {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      continue;
+    }
+    if (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+      clean[key] = removeUndefinedFields(value);
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean as T;
+}
+
 // Tea & Snacks
 export async function createTeaSnackLog(log: Omit<TeaSnackLog, 'id'>): Promise<string> {
   // Query check for duplicate date
@@ -941,7 +957,12 @@ export async function createTeaSnackLog(log: Omit<TeaSnackLog, 'id'>): Promise<s
     throw err;
   }
 
-  await setDoc(docRef, log);
+  const safeData = removeUndefinedFields({
+    ...log,
+    notes: log.notes ?? '',
+  });
+
+  await setDoc(docRef, safeData);
   return deterministicId;
 }
 
@@ -950,10 +971,19 @@ export async function updateTeaSnackLog(
   updates: Partial<TeaSnackLog>
 ): Promise<void> {
   const docRef = doc(db, 'teaSnackLogs', logId);
-  await updateDoc(docRef, {
+
+  const safeUpdates: Record<string, any> = {
     ...updates,
     updatedAt: new Date().toISOString(),
-  });
+  };
+
+  if ('notes' in updates) {
+    safeUpdates.notes = updates.notes ?? '';
+  }
+
+  const cleanUpdates = removeUndefinedFields(safeUpdates);
+
+  await updateDoc(docRef, cleanUpdates);
 }
 
 export async function deleteTeaSnackLog(logId: string): Promise<void> {
