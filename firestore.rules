@@ -40,8 +40,13 @@ service cloud.firestore {
       return isAuthenticated() && (
         isDirector() ||
         isAdmin() ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true)
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          (('approved' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true) ||
+          (('status' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) && 
+           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'))
+        ))
       );
     }
 
@@ -224,23 +229,21 @@ service cloud.firestore {
     // CLIENTS
     match /clients/{clientId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isApproved();
-      allow update: if isAuthenticated() && isApproved();
+      allow create, update: if isAuthenticated();
       allow delete: if isDirector() || isAdmin();
     }
 
     // CLIENT RECORDS
     match /clientRecords/{recordId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isApproved();
-      allow update: if isAuthenticated() && isApproved();
+      allow create, update: if isAuthenticated();
       allow delete: if isDirector() || isAdmin();
     }
 
     // CLIENT CATEGORIES
     match /clientCategories/{catId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
+      allow create, update: if isAuthenticated();
       allow delete: if isDirector() || isAdmin();
     }
 
@@ -255,13 +258,12 @@ service cloud.firestore {
     // CAMPAIGNS (WHATSAPP & SMS)
     match /campaigns/{campaignId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
-      allow update: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
+      allow create, update: if isAuthenticated();
       allow delete: if isDirector() || isAdmin();
 
       match /batches/{batchId} {
         allow read: if isAuthenticated();
-        allow write: if isAuthenticated() && (isApproved() || isAdmin() || isDirector());
+        allow write: if isAuthenticated();
       }
     }
 

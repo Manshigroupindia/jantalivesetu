@@ -130,6 +130,7 @@ self.addEventListener('fetch', (event) => {
     event.request.destination === 'document' ||
     url.pathname.endsWith('.html') ||
     url.pathname === '/' ||
+    !url.pathname.includes('.') ||
     Boolean(event.request.headers.get('accept')?.includes('text/html'));
 
   if (isNavigation) {
@@ -191,7 +192,7 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(async () => {
-          if (event.request.headers.get('accept')?.includes('text/html')) {
+          if (!url.pathname.includes('.') || event.request.headers.get('accept')?.includes('text/html')) {
             const indexHtml = await caches.match('/index.html');
             if (indexHtml) return indexHtml;
           }
