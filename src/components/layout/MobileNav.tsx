@@ -63,6 +63,7 @@ export const MobileNav: React.FC = () => {
 
   // Filter items based on single-source permissions
   const authorizedItems = ALL_NAV_ITEMS.filter((item) => {
+    if (item.hidden) return false;
     if (item.isDirectorOnly) return isDirector;
     if (item.permission) return can(item.permission);
     return true;

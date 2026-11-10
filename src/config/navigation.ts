@@ -36,6 +36,7 @@ export interface NavItemConfig {
   isDirectorOnly?: boolean;
   showInBottomNav?: boolean;
   bottomNavOrder?: number;
+  hidden?: boolean;
 }
 
 export const CATEGORY_LABELS: Record<NavCategory, string> = {
@@ -162,6 +163,7 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
     icon: MessageCircle,
     category: 'management',
     permission: 'campaigns.view',
+    hidden: true,
   },
 
   // FACILITIES & CLEANING
