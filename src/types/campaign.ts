@@ -20,6 +20,8 @@ export interface Client {
   updatedAt: string;
 }
 
+export type DeliveryMethod = 'whatsapp' | 'sms';
+
 export type CampaignType =
   | 'Festival Wishes'
   | 'Event Invitation'
@@ -50,8 +52,9 @@ export interface CampaignBatch {
   recipientIds: string[];
   recipients: BatchRecipient[];
   recipientCount: number;
-  status: 'prepared' | 'manually_sent';
+  status: 'prepared' | 'opened_in_messages' | 'manually_sent';
   preparedAt: string;
+  openedInMessagesAt?: string;
   manuallySentAt?: string;
   markedSentBy?: string;
   markedSentByName?: string;
@@ -61,6 +64,7 @@ export interface Campaign {
   id: string;
   campaignName: string;
   campaignType: CampaignType;
+  deliveryMethod?: DeliveryMethod; // 'whatsapp' (default) | 'sms'
   description?: string;
   imageUrl?: string;
   imagePublicId?: string;
@@ -73,9 +77,18 @@ export interface Campaign {
   totalSelected: number;
   totalEligible: number;
   totalExcluded: number;
+  batchSize?: number;
   totalBatches: number;
   batches: CampaignBatch[];
   status: CampaignStatus;
+  smsMetadata?: {
+    charCount: number;
+    segments: number;
+    isUnicode: boolean;
+    encoding: 'GSM-7' | 'Unicode';
+    hasHindi: boolean;
+    hasEmoji: boolean;
+  };
   createdBy: string;
   createdByName?: string;
   createdAt: string;
@@ -94,6 +107,7 @@ export interface CampaignLog {
     | 'created'
     | 'draft_saved'
     | 'prepared'
+    | 'batch_opened_in_sms'
     | 'batch_sent'
     | 'all_sent'
     | 'cancelled'

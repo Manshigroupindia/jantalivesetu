@@ -4,7 +4,9 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import {
   Download,
-  Info
+  Info,
+  Smartphone,
+  MessageSquare
 } from 'lucide-react';
 import { Campaign, CampaignLog } from '../../types/campaign';
 import { fetchCampaignLogs } from '../../services/campaignService';
@@ -36,8 +38,10 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
     }
   }, [isOpen, campaign.id]);
 
+  const isSms = campaign.deliveryMethod === 'sms';
   const sentBatches = campaign.batches.filter((b) => b.status === 'manually_sent');
-  const pendingBatches = campaign.batches.filter((b) => b.status !== 'manually_sent');
+  const openedBatches = campaign.batches.filter((b) => b.status === 'opened_in_messages');
+  const pendingBatches = campaign.batches.filter((b) => b.status !== 'manually_sent' && b.status !== 'opened_in_messages');
   const sentRecipientsCount = sentBatches.reduce((acc, b) => acc + b.recipientCount, 0);
 
   // Export Complete Report as CSV
@@ -45,6 +49,7 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
     // 1. Compile all recipients across all batches with their status
     const rows: Array<{
       campaignName: string;
+      deliveryChannel: string;
       campaignType: string;
       batchNumber: number;
       batchStatus: string;
@@ -58,11 +63,14 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
       b.recipients.forEach((r) => {
         rows.push({
           campaignName: campaign.campaignName,
+          deliveryChannel: isSms ? 'SMS (Android Messages)' : 'WhatsApp Broadcast',
           campaignType: campaign.campaignType,
           batchNumber: b.batchNumber,
           batchStatus: b.status.toUpperCase(),
           manuallySentAt: b.manuallySentAt
             ? new Date(b.manuallySentAt).toLocaleString()
+            : b.openedInMessagesAt
+            ? `Opened: ${new Date(b.openedInMessagesAt).toLocaleString()}`
             : 'Pending',
           clientName: r.name,
           mobileNumber: r.normalizedPhone || r.phone,
@@ -73,10 +81,11 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
 
     const csvData = generateCSV(rows, [
       { key: 'campaignName', label: 'Campaign Name' },
+      { key: 'deliveryChannel', label: 'Delivery Channel' },
       { key: 'campaignType', label: 'Campaign Type' },
-      { key: 'batchNumber', label: 'Broadcast Batch' },
+      { key: 'batchNumber', label: 'Batch Number' },
       { key: 'batchStatus', label: 'Batch Status' },
-      { key: 'manuallySentAt', label: 'Confirmed Sent Timestamp' },
+      { key: 'manuallySentAt', label: 'Timestamp' },
       { key: 'clientName', label: 'Recipient Name' },
       { key: 'mobileNumber', label: 'Mobile Number' },
       { key: 'company', label: 'Company' },
@@ -93,8 +102,27 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
         {/* SUMMARY HEADER BANNER */}
         <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-black text-gray-900">{campaign.campaignName}</h3>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-black inline-flex items-center gap-1 ${
+                  isSms
+                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                }`}
+              >
+                {isSms ? (
+                  <>
+                    <Smartphone className="w-3 h-3" />
+                    SMS Campaign
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-3 h-3" />
+                    WhatsApp Broadcast
+                  </>
+                )}
+              </span>
               <Badge variant="brand" size="sm">
                 {campaign.campaignType}
               </Badge>
@@ -103,6 +131,28 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
               Created on {new Date(campaign.createdAt).toLocaleDateString()} by{' '}
               <span className="font-bold text-gray-700">{campaign.createdByName || 'Admin'}</span>
             </p>
+
+            {isSms && campaign.smsMetadata && (
+              <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-blue-800 font-mono">
+                <span className="font-bold">Length: {campaign.smsMetadata.charCount} chars</span>
+                <span>•</span>
+                <span className="font-bold">{campaign.smsMetadata.segments} segment(s)</span>
+                <span>•</span>
+                <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 text-[10px] font-bold">
+                  {campaign.smsMetadata.encoding}
+                </span>
+                {campaign.smsMetadata.hasHindi && (
+                  <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                    Hindi
+                  </span>
+                )}
+                {campaign.smsMetadata.hasEmoji && (
+                  <span className="px-1.5 py-0.2 rounded bg-pink-100 text-pink-800 text-[10px] font-bold">
+                    Emoji
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <Button
@@ -141,33 +191,55 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
 
           <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
             <span className="text-[10px] font-black uppercase text-amber-800 block">Pending Batches</span>
-            <p className="text-xl font-black font-mono text-amber-950 mt-0.5">{pendingBatches.length}</p>
+            <p className="text-xl font-black font-mono text-amber-950 mt-0.5">{pendingBatches.length + openedBatches.length}</p>
             <span className="text-[10px] text-amber-700">
-              {pendingBatches.reduce((acc, b) => acc + b.recipientCount, 0)} recipients pending
+              {isSms && openedBatches.length > 0
+                ? `${openedBatches.length} opened in app`
+                : `${pendingBatches.reduce((acc, b) => acc + b.recipientCount, 0)} recipients pending`}
             </span>
           </div>
         </div>
 
         {/* CLARITY NOTICE: PREPARED VS CONFIRMED VS DELIVERY */}
-        <div className="p-3 rounded-xl bg-brand-50 border border-brand-200 text-brand-950 space-y-1">
-          <p className="font-extrabold flex items-center gap-1.5 text-brand-900">
-            <Info className="w-4 h-4 text-brand-600 shrink-0" />
+        <div className={`p-3 rounded-xl border space-y-1 ${
+          isSms ? 'bg-blue-50 border-blue-200 text-blue-950' : 'bg-brand-50 border-brand-200 text-brand-950'
+        }`}>
+          <p className={`font-extrabold flex items-center gap-1.5 ${isSms ? 'text-blue-900' : 'text-brand-900'}`}>
+            <Info className={`w-4 h-4 shrink-0 ${isSms ? 'text-blue-600' : 'text-brand-600'}`} />
             Zero-Cost Architecture Delivery Transparency:
           </p>
-          <ul className="list-disc list-inside space-y-0.5 text-[11px] text-brand-900 leading-normal">
-            <li>
-              <b>Prepared Recipients ({campaign.totalEligible}):</b> Verified opt-in clients segmented into WhatsApp Business broadcast batches.
-            </li>
-            <li>
-              <b>Manually Confirmed Sent ({sentRecipientsCount}):</b> Batches that the administrator confirmed sending manually via WhatsApp Business.
-            </li>
-            <li>
-              <b>Actual WhatsApp Delivery:</b> Governed by WhatsApp's anti-spam rules (messages are delivered only if the client has saved the company number in their phone). Automated read/delivery receipts are not available via native broadcast.
-            </li>
+          <ul className={`list-disc list-inside space-y-0.5 text-[11px] leading-normal ${
+            isSms ? 'text-blue-900' : 'text-brand-900'
+          }`}>
+            {isSms ? (
+              <>
+                <li>
+                  <b>Prepared Recipients ({campaign.totalEligible}):</b> Verified opt-in clients organized into SMS batches (max {campaign.batchSize || 10} numbers/batch).
+                </li>
+                <li>
+                  <b>Opened in Messages / Sent:</b> Batches launched into Android Messages app where the administrator manually taps Send.
+                </li>
+                <li>
+                  <b>Actual SMS Carrier Delivery:</b> Dispatched from your phone's SIM card using your carrier plan. Zero third-party gateway fees are incurred.
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <b>Prepared Recipients ({campaign.totalEligible}):</b> Verified opt-in clients segmented into WhatsApp Business broadcast batches.
+                </li>
+                <li>
+                  <b>Manually Confirmed Sent ({sentRecipientsCount}):</b> Batches that the administrator confirmed sending manually via WhatsApp Business.
+                </li>
+                <li>
+                  <b>Actual WhatsApp Delivery:</b> Governed by WhatsApp's anti-spam rules (messages are delivered only if the client has saved the company number in their phone).
+                </li>
+              </>
+            )}
           </ul>
         </div>
 
-        {/* BATCH-BY-BATCH AUDIT STATUS */}
+        {/* BATCH-BY-BY-BATCH AUDIT STATUS */}
         <div className="space-y-2">
           <h4 className="font-extrabold text-gray-900 uppercase tracking-wider text-[11px]">
             Batch Breakdown Audit ({campaign.batches.length} Batches)
@@ -188,10 +260,28 @@ export const CampaignReportModal: React.FC<CampaignReportModalProps> = ({
                       {b.markedSentByName || 'Admin'}
                     </p>
                   )}
+                  {b.status === 'opened_in_messages' && b.openedInMessagesAt && !b.manuallySentAt && (
+                    <p className="text-[11px] text-blue-700 font-medium">
+                      Opened in Messages on {new Date(b.openedInMessagesAt).toLocaleString()}
+                    </p>
+                  )}
                 </div>
 
-                <Badge variant={b.status === 'manually_sent' ? 'success' : 'neutral'} size="sm">
-                  {b.status === 'manually_sent' ? 'MANUALLY SENT' : 'PREPARED / PENDING'}
+                <Badge
+                  variant={
+                    b.status === 'manually_sent'
+                      ? 'success'
+                      : b.status === 'opened_in_messages'
+                      ? 'warning'
+                      : 'neutral'
+                  }
+                  size="sm"
+                >
+                  {b.status === 'manually_sent'
+                    ? 'MANUALLY SENT'
+                    : b.status === 'opened_in_messages'
+                    ? 'OPENED IN MESSAGES'
+                    : 'PREPARED / PENDING'}
                 </Badge>
               </div>
             ))}

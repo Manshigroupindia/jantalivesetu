@@ -28,6 +28,7 @@ import {
   CAMPAIGN_TYPES,
   Client,
   ClientCategory,
+  DeliveryMethod,
 } from '../../types/campaign';
 import {
   fetchClients,
@@ -36,6 +37,7 @@ import {
 } from '../../services/campaignService';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
 import { normalizePhone, formatPhone } from '../../utils/phoneUtils';
+import { analyzeSmsText } from '../../utils/smsUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -62,7 +64,11 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
   // Data
   const [clients, setClients] = useState<Client[]>([]);
   const [categories, setCategories] = useState<ClientCategory[]>([]);
-  // STEP 1: Campaign Information
+  // STEP 1: Campaign Information & Delivery Method
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(
+    initialCampaign?.deliveryMethod || 'whatsapp'
+  );
+  const [smsBatchSize, setSmsBatchSize] = useState<number>(initialCampaign?.batchSize || 10);
   const [campaignName, setCampaignName] = useState(initialCampaign?.campaignName || '');
   const [campaignType, setCampaignType] = useState<CampaignType>(
     initialCampaign?.campaignType || 'Festival Wishes'
@@ -200,6 +206,11 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
     return text;
   }, [message, websiteUrl, contactDetails, previewClient]);
 
+  // Realtime SMS Analysis
+  const smsAnalysis = useMemo(() => {
+    return analyzeSmsText(personalizedPreview);
+  }, [personalizedPreview]);
+
   // Copy Preview Caption
   const handleCopyCaption = () => {
     navigator.clipboard.writeText(personalizedPreview);
@@ -242,7 +253,7 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
         return;
       }
 
-      // Must have WhatsApp Consent and not opted out
+      // Must have Marketing/WhatsApp Consent and not opted out
       if (!c.whatsappConsent || c.optedOut) {
         excludedNoConsentCount++;
         return;
@@ -275,8 +286,9 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
     };
   }, [clients, audienceType, selectedCategories, selectedClientIds]);
 
-  // Estimated Batches (max 256 recipients per batch)
-  const batchCount = Math.ceil(eligibleClients.length / 256) || 1;
+  // Estimated Batches (256 for WhatsApp Broadcast, configurable for SMS)
+  const batchLimit = deliveryMethod === 'sms' ? smsBatchSize : 256;
+  const batchCount = Math.ceil(eligibleClients.length / batchLimit) || 1;
 
   // STEP 4 Recipient Table Filtering (for 'selected' audience mode)
   const searchableClientsForSelection = useMemo(() => {
@@ -354,6 +366,8 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
         {
           campaignName: campaignName.trim(),
           campaignType,
+          deliveryMethod,
+          batchSize: deliveryMethod === 'sms' ? smsBatchSize : 256,
           description: description.trim(),
           imageUrl,
           imagePublicId,
@@ -366,6 +380,14 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
           totalSelected: totalSelectedCount,
           totalExcluded: totalSelectedCount - eligibleClients.length,
           status: 'draft',
+          smsMetadata: deliveryMethod === 'sms' ? {
+            charCount: smsAnalysis.charCount,
+            segments: smsAnalysis.segments,
+            isUnicode: smsAnalysis.isUnicode,
+            encoding: smsAnalysis.encoding,
+            hasHindi: smsAnalysis.hasHindi,
+            hasEmoji: smsAnalysis.hasEmoji,
+          } : undefined,
           createdBy: userDoc?.uid || '',
           createdByName: userDoc?.name || 'Admin',
         },
@@ -384,7 +406,7 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
     }
   };
 
-  // Submit and Prepare WhatsApp Campaign
+  // Submit and Prepare Campaign (WhatsApp or SMS)
   const handleConfirmPrepare = async () => {
     setSubmitting(true);
     try {
@@ -392,6 +414,8 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
         {
           campaignName: campaignName.trim(),
           campaignType,
+          deliveryMethod,
+          batchSize: deliveryMethod === 'sms' ? smsBatchSize : 256,
           description: description.trim(),
           imageUrl,
           imagePublicId,
@@ -404,6 +428,14 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
           totalSelected: totalSelectedCount,
           totalExcluded: totalSelectedCount - eligibleClients.length,
           status: 'prepared',
+          smsMetadata: deliveryMethod === 'sms' ? {
+            charCount: smsAnalysis.charCount,
+            segments: smsAnalysis.segments,
+            isUnicode: smsAnalysis.isUnicode,
+            encoding: smsAnalysis.encoding,
+            hasHindi: smsAnalysis.hasHindi,
+            hasEmoji: smsAnalysis.hasEmoji,
+          } : undefined,
           createdBy: userDoc?.uid || '',
           createdByName: userDoc?.name || 'Admin',
         },
@@ -414,7 +446,7 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
 
       setConfirmModalOpen(false);
       showToast(
-        `Campaign prepared! Formatted into ${batchCount} WhatsApp Broadcast batch(es).`,
+        `Campaign prepared! Formatted into ${batchCount} ${deliveryMethod === 'sms' ? 'SMS Messages' : 'WhatsApp Broadcast'} batch(es).`,
         'success'
       );
       if (onCampaignCreated) onCampaignCreated(campId);
@@ -433,10 +465,12 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
         <div>
           <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             <Send className="w-6 h-6 text-brand-600" />
-            Create WhatsApp Client Campaign
+            Create {deliveryMethod === 'sms' ? 'SMS Client Campaign' : 'WhatsApp Client Campaign'}
           </h2>
           <p className="text-xs text-gray-500 font-medium">
-            Draft, customize, segment, and prepare zero-cost WhatsApp Business Broadcast campaigns.
+            {deliveryMethod === 'sms'
+              ? 'Draft, customize, segment, and prepare free SMS campaigns using your Android Messages app.'
+              : 'Draft, customize, segment, and prepare zero-cost WhatsApp Business Broadcast campaigns.'}
           </p>
         </div>
 
@@ -498,6 +532,110 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
               required
             />
 
+            {/* DELIVERY METHOD SELECTOR */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+                Campaign Delivery Method *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('whatsapp')}
+                  className={`p-4 rounded-2xl border text-left transition-all flex items-start gap-3.5 ${
+                    deliveryMethod === 'whatsapp'
+                      ? 'border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <div
+                    className={`p-2.5 rounded-xl ${
+                      deliveryMethod === 'whatsapp' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-extrabold text-gray-900">WhatsApp Broadcast</span>
+                      {deliveryMethod === 'whatsapp' && (
+                        <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Native WhatsApp Business broadcast lists. Up to 256 contacts per list, rich text & images with zero subscription cost.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('sms')}
+                  className={`p-4 rounded-2xl border text-left transition-all flex items-start gap-3.5 ${
+                    deliveryMethod === 'sms'
+                      ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-xs'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <div
+                    className={`p-2.5 rounded-xl ${
+                      deliveryMethod === 'sms' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    <Send className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-extrabold text-gray-900">SMS Campaign</span>
+                      {deliveryMethod === 'sms' && (
+                        <span className="text-[10px] font-black text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Free native SMS composer. Prefills your Android Messages app with multi-recipient batches for manual send without gateway fees.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* SMS BATCH SIZE SELECTOR (Visible when SMS is selected) */}
+            {deliveryMethod === 'sms' && (
+              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-2.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    SMS Batch Size (Recipients Per Session)
+                  </label>
+                  <span className="text-xs font-mono font-bold text-blue-800 bg-blue-100 px-2.5 py-0.5 rounded-md">
+                    {smsBatchSize} Contacts / Batch
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {[5, 10, 15, 20, 25].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setSmsBatchSize(size)}
+                      className={`py-2 text-xs font-bold rounded-xl border text-center transition-all ${
+                        smsBatchSize === size
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-blue-900/80 leading-relaxed">
+                  Default: 10 recipients per batch. Most Android Messages applications reliably handle 10 recipients per intent. Choose 5 if your device or carrier restricts group SMS.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">
                 Campaign Type *
@@ -543,6 +681,18 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
             Upload promotional banners, greeting cards, or flyers. Supports JPG, JPEG, PNG, and WebP.
             Images are securely synced and hosted via the company's Cloudinary storage.
           </p>
+
+          {deliveryMethod === 'sms' && (
+            <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                MMS Image Attachment Notice:
+              </p>
+              <p className="text-[11px] text-blue-800 leading-relaxed">
+                Images attached to SMS campaigns are shared with your device's Messages app via Android MMS intent. MMS prefill depends on carrier and device support. If your SMS app opens with text-only, you can use the 1-click <b>Download Image</b> button on the preparation screen to attach it manually.
+              </p>
+            </div>
+          )}
 
           {imageUrl ? (
             <div className="space-y-3">
@@ -663,6 +813,71 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
                 </div>
               </div>
 
+              {/* SMS CHARACTER & SEGMENT METRICS (When SMS mode is active) */}
+              {deliveryMethod === 'sms' && (
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-blue-900">SMS Segments:</span>
+                      <span className="px-2 py-0.5 rounded-md text-xs font-black bg-blue-600 text-white shadow-xs">
+                        {smsAnalysis.segments} {smsAnalysis.segments === 1 ? 'Part' : 'Parts'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          smsAnalysis.isUnicode
+                            ? 'bg-purple-100 text-purple-800 border-purple-200'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        }`}
+                      >
+                        {smsAnalysis.encoding}
+                      </span>
+                      {smsAnalysis.hasHindi && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          Hindi (हिन्दी)
+                        </span>
+                      )}
+                      {smsAnalysis.hasEmoji && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-pink-100 text-pink-800">
+                          Emoji 😊
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[11px] text-blue-800 font-mono mb-1">
+                      <span>Total: {smsAnalysis.charCount} chars</span>
+                      <span>
+                        {smsAnalysis.remainingInSegment} chars left in segment #{smsAnalysis.segments || 1}
+                      </span>
+                    </div>
+                    <div className="w-full bg-blue-200/60 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 transition-all ${
+                          smsAnalysis.segments > 3 ? 'bg-amber-500' : 'bg-blue-600'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              5,
+                              ((smsAnalysis.charCount % (smsAnalysis.isUnicode ? 67 : 153) || (smsAnalysis.isUnicode ? 67 : 153)) / (smsAnalysis.isUnicode ? (smsAnalysis.segments > 1 ? 67 : 70) : (smsAnalysis.segments > 1 ? 153 : 160))) * 100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-blue-900/80 leading-relaxed">
+                    {smsAnalysis.explanation}
+                  </p>
+                </div>
+              )}
+
               {/* Main Textarea */}
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -675,7 +890,11 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
                   rows={8}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your WhatsApp greeting or announcement..."
+                  placeholder={
+                    deliveryMethod === 'sms'
+                      ? 'Type your SMS message or announcement...'
+                      : 'Type your WhatsApp greeting or announcement...'
+                  }
                   className="w-full text-xs p-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-brand-500 font-sans leading-relaxed"
                   required
                 />
@@ -696,23 +915,34 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
                 />
               </div>
 
-              {/* Broadcast explanation notice */}
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+              {/* Delivery notice */}
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
                 <p className="font-bold flex items-center gap-1.5">
                   <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                  Native WhatsApp Broadcast Notice:
+                  {deliveryMethod === 'sms'
+                    ? 'SMS Multi-Recipient Personalization Notice:'
+                    : 'Native WhatsApp Broadcast Notice:'}
                 </p>
                 <p className="text-[11px] text-amber-800 leading-normal">
-                  WhatsApp Business Broadcast lists send a <b>single unified caption</b> to all recipients in each list. Variables (such as {'{{name}}'}) provide personalized previews, but the native broadcast will send the finalized text.
+                  {deliveryMethod === 'sms' ? (
+                    <>
+                      When sending to multiple recipients in a single SMS session, your phone's Messages app will send the <b>exact same message text</b> to all numbers in that batch. Individual variables (like {'{{name}}'}) will only reflect if sending 1-on-1.
+                    </>
+                  ) : (
+                    <>
+                      WhatsApp Business Broadcast lists send a <b>single unified caption</b> to all recipients in each list. Variables (such as {'{{name}}'}) provide personalized previews, but the native broadcast will send the finalized text.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
 
-            {/* RIGHT: LIVE WHATSAPP CHAT PREVIEW */}
+            {/* RIGHT: LIVE PREVIEW (WhatsApp vs SMS) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5 text-brand-600" /> Live WhatsApp Preview
+                  <Eye className="w-3.5 h-3.5 text-brand-600" />
+                  {deliveryMethod === 'sms' ? 'Live SMS Messages Preview' : 'Live WhatsApp Preview'}
                 </label>
 
                 {clients.length > 0 && (
@@ -734,36 +964,74 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
               </div>
 
               {/* Chat bubble mock */}
-              <div className="bg-[#EFEAE2] p-4 rounded-2xl border border-gray-200 shadow-inner min-h-[360px] flex flex-col justify-end">
-                <div className="max-w-sm ml-auto bg-[#DCF8C6] rounded-2xl p-3 shadow-md space-y-2 text-xs text-gray-900 border border-emerald-100">
-                  {imageUrl && (
-                    <div className="rounded-xl overflow-hidden bg-white/50 border border-emerald-200/50">
-                      <img src={imageUrl} alt="Creative" className="w-full h-auto object-cover" />
+              {deliveryMethod === 'sms' ? (
+                <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 shadow-inner min-h-[360px] flex flex-col justify-end">
+                  <div className="max-w-sm ml-auto bg-white rounded-2xl p-3.5 shadow-md space-y-2 text-xs text-gray-900 border border-slate-200">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between border-b pb-1">
+                      <span>SMS • via SIM 1</span>
+                      <span className="font-bold text-blue-600">{smsAnalysis.segments} Part(s)</span>
                     </div>
-                  )}
 
-                  <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-gray-900 break-words">
-                    {personalizedPreview}
+                    {imageUrl && (
+                      <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-200">
+                        <img src={imageUrl} alt="MMS Creative" className="w-full h-auto object-cover max-h-48" />
+                      </div>
+                    )}
+
+                    <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-gray-900 break-words">
+                      {personalizedPreview}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1 border-t">
+                      <span>{smsAnalysis.charCount} chars ({smsAnalysis.encoding})</span>
+                      <span>Now</span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-1 text-[10px] text-gray-500 pt-1">
-                    <span>10:30 AM</span>
-                    <Check className="w-3 h-3 text-brand-600" />
+                  <div className="pt-4 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50"
+                      icon={<Copy className="w-3.5 h-3.5" />}
+                      onClick={handleCopyCaption}
+                    >
+                      Copy Message
+                    </Button>
                   </div>
                 </div>
+              ) : (
+                <div className="bg-[#EFEAE2] p-4 rounded-2xl border border-gray-200 shadow-inner min-h-[360px] flex flex-col justify-end">
+                  <div className="max-w-sm ml-auto bg-[#DCF8C6] rounded-2xl p-3 shadow-md space-y-2 text-xs text-gray-900 border border-emerald-100">
+                    {imageUrl && (
+                      <div className="rounded-xl overflow-hidden bg-white/50 border border-emerald-200/50">
+                        <img src={imageUrl} alt="Creative" className="w-full h-auto object-cover" />
+                      </div>
+                    )}
 
-                <div className="pt-4 flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50"
-                    icon={<Copy className="w-3.5 h-3.5" />}
-                    onClick={handleCopyCaption}
-                  >
-                    Copy Caption
-                  </Button>
+                    <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-gray-900 break-words">
+                      {personalizedPreview}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1 text-[10px] text-gray-500 pt-1">
+                      <span>10:30 AM</span>
+                      <Check className="w-3 h-3 text-brand-600" />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50"
+                      icon={<Copy className="w-3.5 h-3.5" />}
+                      onClick={handleCopyCaption}
+                    >
+                      Copy Caption
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </Card>
@@ -975,9 +1243,13 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
               </div>
 
               <div className="p-3 rounded-xl bg-purple-50 border border-purple-200">
-                <span className="text-[10px] font-bold text-purple-800 uppercase block">Broadcast Batches</span>
+                <span className="text-[10px] font-bold text-purple-800 uppercase block">
+                  {deliveryMethod === 'sms' ? 'SMS Batches' : 'Broadcast Batches'}
+                </span>
                 <p className="text-xl font-black font-mono text-purple-950 mt-0.5">{batchCount}</p>
-                <span className="text-[10px] text-purple-700">max 256 per batch</span>
+                <span className="text-[10px] text-purple-700">
+                  {deliveryMethod === 'sms' ? `max ${smsBatchSize} per batch` : 'max 256 per batch'}
+                </span>
               </div>
             </div>
           </div>
@@ -989,7 +1261,7 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
         <Card className="p-6 space-y-6 animate-in fade-in duration-150">
           <h3 className="text-base font-extrabold text-gray-900 border-b pb-2 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            Step 5: Review & Prepare Broadcast
+            Step 5: Review & Prepare {deliveryMethod === 'sms' ? 'SMS Campaign' : 'WhatsApp Broadcast'}
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1000,7 +1272,10 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
                   <span className="text-[10px] font-bold text-gray-400 uppercase block">Campaign Name</span>
                   <p className="text-base font-black text-gray-900">{campaignName}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={deliveryMethod === 'sms' ? 'neutral' : 'brand'} size="sm">
+                    {deliveryMethod === 'sms' ? '📱 Free SMS Campaign' : '💬 WhatsApp Broadcast'}
+                  </Badge>
                   <Badge variant="brand" size="sm">
                     {campaignType}
                   </Badge>
@@ -1014,53 +1289,121 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
               </div>
 
               {/* BATCH BREAKDOWN CARD */}
-              <div className="p-4 rounded-2xl bg-brand-50/60 border border-brand-200 space-y-2">
-                <span className="text-xs font-black text-brand-900 uppercase tracking-wider block">
-                  WhatsApp Business Broadcast Distribution
-                </span>
-                <p className="text-xs text-brand-800">
-                  <b>{eligibleClients.length} verified recipients</b> will be organized into{' '}
-                  <b>{batchCount} broadcast batch(es)</b> adhering to native WhatsApp limits (max 256 contacts/list):
-                </p>
+              {deliveryMethod === 'sms' ? (
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2.5">
+                  <span className="text-xs font-black text-blue-900 uppercase tracking-wider block">
+                    Android SMS Messages Distribution
+                  </span>
+                  <p className="text-xs text-blue-800">
+                    <b>{eligibleClients.length} verified recipients</b> organized into{' '}
+                    <b>{batchCount} SMS batch(es)</b> (max {smsBatchSize} contacts/batch for default Messages app):
+                  </p>
 
-                <div className="space-y-1 pt-1 font-mono text-xs">
-                  {Array.from({ length: batchCount }).map((_, idx) => {
-                    const start = idx * 256 + 1;
-                    const end = Math.min((idx + 1) * 256, eligibleClients.length);
-                    const count = end - start + 1;
-                    return (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-lg bg-white border border-brand-100"
-                      >
-                        <span className="font-bold text-gray-800">Batch #{idx + 1}</span>
-                        <span className="text-brand-700 font-semibold">
-                          {count} recipients ({start} to {end})
-                        </span>
-                      </div>
-                    );
-                  })}
+                  <div className="flex items-center gap-2 py-1 px-2.5 bg-white rounded-lg border border-blue-100 text-[11px] text-blue-900">
+                    <span className="font-bold">Estimated Size:</span>
+                    <span>{smsAnalysis.charCount} chars • {smsAnalysis.segments} part(s) ({smsAnalysis.encoding})</span>
+                  </div>
+
+                  <div className="space-y-1 pt-1 font-mono text-xs max-h-48 overflow-y-auto">
+                    {Array.from({ length: batchCount }).map((_, idx) => {
+                      const start = idx * smsBatchSize + 1;
+                      const end = Math.min((idx + 1) * smsBatchSize, eligibleClients.length);
+                      const count = end - start + 1;
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white border border-blue-100"
+                        >
+                          <span className="font-bold text-gray-800">SMS Batch #{idx + 1}</span>
+                          <span className="text-blue-700 font-semibold">
+                            {count} recipients ({start} to {end})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-brand-50/60 border border-brand-200 space-y-2">
+                  <span className="text-xs font-black text-brand-900 uppercase tracking-wider block">
+                    WhatsApp Business Broadcast Distribution
+                  </span>
+                  <p className="text-xs text-brand-800">
+                    <b>{eligibleClients.length} verified recipients</b> will be organized into{' '}
+                    <b>{batchCount} broadcast batch(es)</b> adhering to native WhatsApp limits (max 256 contacts/list):
+                  </p>
+
+                  <div className="space-y-1 pt-1 font-mono text-xs">
+                    {Array.from({ length: batchCount }).map((_, idx) => {
+                      const start = idx * 256 + 1;
+                      const end = Math.min((idx + 1) * 256, eligibleClients.length);
+                      const count = end - start + 1;
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white border border-brand-100"
+                        >
+                          <span className="font-bold text-gray-800">Batch #{idx + 1}</span>
+                          <span className="text-brand-700 font-semibold">
+                            {count} recipients ({start} to {end})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* PREVIEW CREATIVE & MESSAGE */}
             <div className="space-y-3">
-              <span className="text-xs font-bold text-gray-700 block">Preview Creative & Message:</span>
-              <div className="bg-[#EFEAE2] p-4 rounded-2xl border border-gray-200 shadow-inner">
-                <div className="max-w-sm ml-auto bg-[#DCF8C6] rounded-2xl p-3 shadow-md space-y-2 text-xs text-gray-900 border border-emerald-100">
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt="Creative"
-                      className="w-full h-auto object-cover rounded-xl"
-                    />
-                  )}
-                  <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-gray-900">
-                    {personalizedPreview}
+              <span className="text-xs font-bold text-gray-700 block">
+                {deliveryMethod === 'sms' ? 'Preview SMS Message & Media:' : 'Preview Creative & Message:'}
+              </span>
+
+              {deliveryMethod === 'sms' ? (
+                <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 shadow-inner min-h-[300px] flex flex-col justify-end">
+                  <div className="max-w-sm ml-auto bg-white rounded-2xl p-3.5 shadow-md space-y-2 text-xs text-gray-900 border border-slate-200">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between border-b pb-1">
+                      <span>SMS • Carrier App</span>
+                      <span className="font-bold text-blue-600">{smsAnalysis.segments} Part(s)</span>
+                    </div>
+
+                    {imageUrl && (
+                      <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-200">
+                        <img
+                          src={imageUrl}
+                          alt="Creative"
+                          className="w-full h-auto object-cover max-h-48"
+                        />
+                      </div>
+                    )}
+
+                    <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-gray-900 break-words">
+                      {personalizedPreview}
+                    </div>
+
+                    <div className="text-[10px] text-gray-400 text-right pt-1 border-t">
+                      {smsAnalysis.charCount} chars ({smsAnalysis.encoding})
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-[#EFEAE2] p-4 rounded-2xl border border-gray-200 shadow-inner">
+                  <div className="max-w-sm ml-auto bg-[#DCF8C6] rounded-2xl p-3 shadow-md space-y-2 text-xs text-gray-900 border border-emerald-100">
+                    {imageUrl && (
+                      <img
+                        src={imageUrl}
+                        alt="Creative"
+                        className="w-full h-auto object-cover rounded-xl"
+                      />
+                    )}
+                    <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-gray-900">
+                      {personalizedPreview}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1086,7 +1429,7 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
                 icon={<Send className="w-4 h-4" />}
                 onClick={() => setConfirmModalOpen(true)}
               >
-                Prepare WhatsApp Campaign
+                {deliveryMethod === 'sms' ? 'Prepare SMS Campaign' : 'Prepare WhatsApp Campaign'}
               </Button>
             </div>
           </div>
@@ -1119,26 +1462,50 @@ export const CreateCampaign: React.FC<CreateCampaignProps> = ({
       <Modal
         isOpen={confirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
-        title="Confirm WhatsApp Broadcast Preparation"
+        title={deliveryMethod === 'sms' ? 'Confirm SMS Campaign Preparation' : 'Confirm WhatsApp Broadcast Preparation'}
         maxWidth="md"
       >
         <div className="space-y-4 text-xs">
-          <div className="p-4 rounded-2xl bg-brand-50 border border-brand-200 space-y-2 text-brand-950">
-            <p className="font-extrabold text-sm text-brand-900 flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-brand-600 shrink-0" />
-              Native Broadcast Preparation
+          <div className={`p-4 rounded-2xl border space-y-2 ${
+            deliveryMethod === 'sms'
+              ? 'bg-blue-50 border-blue-200 text-blue-950'
+              : 'bg-brand-50 border-brand-200 text-brand-950'
+          }`}>
+            <p className={`font-extrabold text-sm flex items-center gap-1.5 ${
+              deliveryMethod === 'sms' ? 'text-blue-900' : 'text-brand-900'
+            }`}>
+              <Info className={`w-4 h-4 shrink-0 ${deliveryMethod === 'sms' ? 'text-blue-600' : 'text-brand-600'}`} />
+              {deliveryMethod === 'sms' ? 'Android Device SMS Preparation' : 'Native Broadcast Preparation'}
             </p>
             <p className="leading-relaxed">
-              This action will prepare your campaign and recipient list into{' '}
-              <b>{batchCount} broadcast batch(es)</b>. It will <b>NOT</b> automatically send WhatsApp
-              messages. You must use <b>WhatsApp Business Broadcast</b> to send them.
+              {deliveryMethod === 'sms' ? (
+                <>
+                  This action will prepare your campaign into <b>{batchCount} SMS batch(es)</b>. It will <b>NOT</b> automatically send SMS messages or incur API charges. You will open your default Android SMS/Messages app and manually press Send for each batch.
+                </>
+              ) : (
+                <>
+                  This action will prepare your campaign and recipient list into{' '}
+                  <b>{batchCount} broadcast batch(es)</b>. It will <b>NOT</b> automatically send WhatsApp
+                  messages. You must use <b>WhatsApp Business Broadcast</b> to send them.
+                </>
+              )}
             </p>
           </div>
 
           <div className="space-y-1.5 text-gray-600">
             <p>✓ <b>{eligibleClients.length}</b> verified opted-in recipients will be locked in.</p>
-            <p>✓ You can copy caption, download images, and export batch contacts (vCard/CSV).</p>
-            <p>✓ You can track and mark each batch as manually sent as you complete them.</p>
+            {deliveryMethod === 'sms' ? (
+              <>
+                <p>✓ Prepares batches ({smsBatchSize} per batch) compatible with Android Messages app.</p>
+                <p>✓ One-click launch to open default SMS app with prefilled recipients and text.</p>
+                <p>✓ Track which batches have been opened or sent.</p>
+              </>
+            ) : (
+              <>
+                <p>✓ You can copy caption, download images, and export batch contacts (vCard/CSV).</p>
+                <p>✓ You can track and mark each batch as manually sent as you complete them.</p>
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t">

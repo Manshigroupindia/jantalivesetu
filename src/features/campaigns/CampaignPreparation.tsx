@@ -28,6 +28,7 @@ import { generateCSV } from '../../utils/csvUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { CampaignReportModal } from './CampaignReportModal';
+import { SmsCampaignPreparation } from './SmsCampaignPreparation';
 
 export const CampaignPreparation: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -88,6 +89,11 @@ export const CampaignPreparation: React.FC = () => {
   }
 
   if (!campaign) return null;
+
+  // Delegate to dedicated SMS Preparation workflow if campaign delivery method is SMS
+  if (campaign.deliveryMethod === 'sms') {
+    return <SmsCampaignPreparation campaign={campaign} onRefresh={loadCampaign} />;
+  }
 
   const activeBatch: CampaignBatch | undefined = campaign.batches[selectedBatchIdx] || campaign.batches[0];
 

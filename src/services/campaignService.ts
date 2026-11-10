@@ -292,14 +292,16 @@ export async function deleteCategory(id: string): Promise<void> {
 const BROADCAST_BATCH_LIMIT = 256;
 
 export function splitIntoBroadcastBatches(
-  eligibleClients: Client[]
+  eligibleClients: Client[],
+  batchLimit: number = BROADCAST_BATCH_LIMIT
 ): CampaignBatch[] {
   const batches: CampaignBatch[] = [];
+  const limit = Math.max(1, batchLimit);
   const total = eligibleClients.length;
 
-  for (let i = 0; i < total; i += BROADCAST_BATCH_LIMIT) {
-    const chunk = eligibleClients.slice(i, i + BROADCAST_BATCH_LIMIT);
-    const batchNumber = Math.floor(i / BROADCAST_BATCH_LIMIT) + 1;
+  for (let i = 0; i < total; i += limit) {
+    const chunk = eligibleClients.slice(i, i + limit);
+    const batchNumber = Math.floor(i / limit) + 1;
 
     batches.push({
       id: `batch_${batchNumber}`,
@@ -360,11 +362,15 @@ export async function createCampaign(
 ): Promise<string> {
   const now = new Date().toISOString();
 
-  // Divide eligible recipients into 256-sized batches
-  const batches = splitIntoBroadcastBatches(eligibleClients);
+  // Divide eligible recipients into batches based on delivery method and batchSize
+  const deliveryMethod = campaignData.deliveryMethod || 'whatsapp';
+  const batchLimit = campaignData.batchSize || (deliveryMethod === 'sms' ? 10 : BROADCAST_BATCH_LIMIT);
+  const batches = splitIntoBroadcastBatches(eligibleClients, batchLimit);
 
   const payload: Omit<Campaign, 'id'> = {
     ...campaignData,
+    deliveryMethod,
+    batchSize: batchLimit,
     totalEligible: eligibleClients.length,
     totalBatches: batches.length,
     batches,
@@ -377,14 +383,16 @@ export async function createCampaign(
 
   const docRef = await addDoc(collection(db, 'campaigns'), cleanData(payload));
 
+  const methodLabel = deliveryMethod === 'sms' ? 'SMS Messages' : 'WhatsApp Broadcast';
+
   // Log creation activity
   await logCampaignActivity({
     campaignId: docRef.id,
     action: payload.status === 'draft' ? 'draft_saved' : 'prepared',
     description:
       payload.status === 'draft'
-        ? `Campaign "${payload.campaignName}" saved as draft.`
-        : `Campaign "${payload.campaignName}" prepared with ${eligibleClients.length} recipients across ${batches.length} WhatsApp broadcast batches.`,
+        ? `${methodLabel} Campaign "${payload.campaignName}" saved as draft.`
+        : `${methodLabel} Campaign "${payload.campaignName}" prepared with ${eligibleClients.length} recipients across ${batches.length} batches.`,
     performedBy: userId || '',
     performedByName: userName || 'Admin',
     timestamp: now,
@@ -393,9 +401,10 @@ export async function createCampaign(
   return docRef.id;
 }
 
-export async function markBatchAsSent(
+export async function updateBatchStatus(
   campaignId: string,
   batchNumber: number,
+  status: 'prepared' | 'opened_in_messages' | 'manually_sent',
   userId?: string,
   userName?: string
 ): Promise<Campaign> {
@@ -410,17 +419,18 @@ export async function markBatchAsSent(
     if (b.batchNumber === batchNumber) {
       return {
         ...b,
-        status: 'manually_sent' as const,
-        manuallySentAt: now,
-        markedSentBy: userId || '',
-        markedSentByName: userName || 'Admin',
+        status,
+        ...(status === 'manually_sent'
+          ? { manuallySentAt: now, markedSentBy: userId || '', markedSentByName: userName || 'Admin' }
+          : {}),
+        ...(status === 'opened_in_messages' ? { openedInMessagesAt: now } : {}),
       };
     }
     return b;
   });
 
   const allSent = updatedBatches.every((b) => b.status === 'manually_sent');
-  const someSent = updatedBatches.some((b) => b.status === 'manually_sent');
+  const someSent = updatedBatches.some((b) => b.status === 'manually_sent' || b.status === 'opened_in_messages');
 
   const newStatus: CampaignStatus = allSent
     ? 'manually_sent'
@@ -432,26 +442,45 @@ export async function markBatchAsSent(
     batches: updatedBatches,
     status: newStatus,
     updatedAt: now,
-    partiallySentAt: campaign.partiallySentAt || now,
+    partiallySentAt: campaign.partiallySentAt || (someSent ? now : undefined),
     ...(allSent ? { manuallySentAt: now } : {}),
   };
 
   await updateDoc(docRef, cleanData(updates));
 
-  // Log activity
+  const isSms = campaign.deliveryMethod === 'sms';
+  const methodLabel = isSms ? 'SMS Messages' : 'WhatsApp Business';
+  let action: CampaignLog['action'] = 'batch_sent';
+  let logDesc = `Batch #${batchNumber} marked as ${status} in ${methodLabel} by ${userName || 'Admin'}.`;
+
+  if (status === 'opened_in_messages') {
+    action = 'batch_opened_in_sms';
+    logDesc = `Batch #${batchNumber} opened in SMS Messages application.`;
+  } else if (allSent) {
+    action = 'all_sent';
+    logDesc = `All batches in campaign "${campaign.campaignName}" manually marked as sent via ${methodLabel}.`;
+  }
+
   await logCampaignActivity({
     campaignId,
     batchId: `batch_${batchNumber}`,
-    action: allSent ? 'all_sent' : 'batch_sent',
-    description: `Batch #${batchNumber} (${
-      updatedBatches.find((b) => b.batchNumber === batchNumber)?.recipientCount || 0
-    } recipients) manually confirmed sent via WhatsApp Business by ${userName || 'Admin'}.`,
+    action,
+    description: logDesc,
     performedBy: userId || '',
     performedByName: userName || 'Admin',
     timestamp: now,
   });
 
   return { ...campaign, ...updates };
+}
+
+export async function markBatchAsSent(
+  campaignId: string,
+  batchNumber: number,
+  userId?: string,
+  userName?: string
+): Promise<Campaign> {
+  return updateBatchStatus(campaignId, batchNumber, 'manually_sent', userId, userName);
 }
 
 export async function cancelCampaign(

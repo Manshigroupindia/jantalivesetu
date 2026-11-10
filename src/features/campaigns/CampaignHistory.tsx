@@ -12,9 +12,11 @@ import {
   Trash2,
   FileText,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Smartphone,
+  MessageSquare
 } from 'lucide-react';
-import { Campaign, CampaignStatus, CAMPAIGN_TYPES } from '../../types/campaign';
+import { Campaign, CampaignStatus, CAMPAIGN_TYPES, DeliveryMethod } from '../../types/campaign';
 import {
   fetchCampaigns,
   deleteCampaignDraft,
@@ -37,6 +39,7 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [deliveryMethodFilter, setDeliveryMethodFilter] = useState<'ALL' | DeliveryMethod>('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | 'ALL'>('ALL');
   const [dateFilter, setDateFilter] = useState<'ALL' | '7days' | '30days' | 'this_month'>('ALL');
@@ -66,6 +69,12 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
     const now = new Date();
 
     return campaigns.filter((c) => {
+      // Channel / Delivery method filter
+      if (deliveryMethodFilter !== 'ALL') {
+        const method = c.deliveryMethod || 'whatsapp';
+        if (method !== deliveryMethodFilter) return false;
+      }
+
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -103,7 +112,7 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
 
       return true;
     });
-  }, [campaigns, searchQuery, typeFilter, statusFilter, dateFilter]);
+  }, [campaigns, searchQuery, deliveryMethodFilter, typeFilter, statusFilter, dateFilter]);
 
   // Duplicate Campaign
   const handleDuplicate = (c: Campaign) => {
@@ -164,10 +173,10 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
         <div>
           <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             <History className="w-6 h-6 text-brand-600" />
-            WhatsApp Campaign History & Logs
+            Campaign History & Audit Trail
           </h2>
           <p className="text-xs text-gray-500 font-medium">
-            Audit trail of all prepared, draft, and manually sent WhatsApp broadcast campaigns.
+            Audit trail of all prepared, draft, and manually sent WhatsApp & SMS campaigns.
           </p>
         </div>
 
@@ -194,13 +203,25 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
 
       {/* FILTERS CARD */}
       <Card className="p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <Input
             placeholder="Search campaigns..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             icon={<Search className="w-4 h-4 text-gray-400" />}
           />
+
+          <div>
+            <select
+              value={deliveryMethodFilter}
+              onChange={(e) => setDeliveryMethodFilter(e.target.value as any)}
+              className="w-full text-xs p-2.5 rounded-xl border border-gray-200 bg-white font-medium focus:ring-1 focus:ring-brand-500"
+            >
+              <option value="ALL">All Channels (WhatsApp & SMS)</option>
+              <option value="whatsapp">💬 WhatsApp Broadcast</option>
+              <option value="sms">📱 Free Android SMS</option>
+            </select>
+          </div>
 
           <div>
             <select
@@ -258,9 +279,9 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
             <History className="w-10 h-10 mx-auto text-gray-300" />
             <p className="text-sm font-bold text-gray-600">No campaigns found</p>
             <p className="text-xs text-gray-400 max-w-sm mx-auto">
-              {searchQuery || typeFilter !== 'ALL' || statusFilter !== 'ALL'
+              {searchQuery || deliveryMethodFilter !== 'ALL' || typeFilter !== 'ALL' || statusFilter !== 'ALL'
                 ? 'Try adjusting your filter settings.'
-                : 'Get started by creating your first WhatsApp campaign.'}
+                : 'Get started by creating your first campaign.'}
             </p>
           </div>
         ) : (
@@ -269,6 +290,7 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/75 text-[11px] font-black text-gray-500 uppercase tracking-wider">
                   <th className="p-3">Campaign Name & Type</th>
+                  <th className="p-3">Channel</th>
                   <th className="p-3 text-center">Recipients</th>
                   <th className="p-3 text-center">Batches</th>
                   <th className="p-3 text-center">Status</th>
@@ -281,6 +303,7 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
               <tbody className="divide-y divide-gray-100">
                 {filteredCampaigns.map((camp) => {
                   const sentCount = camp.batches.filter((b) => b.status === 'manually_sent').length;
+                  const isSms = camp.deliveryMethod === 'sms';
                   return (
                     <tr key={camp.id} className="hover:bg-gray-50/70 transition-colors">
                       {/* Name & Type */}
@@ -288,6 +311,29 @@ export const CampaignHistory: React.FC<CampaignHistoryProps> = ({
                         <div className="font-bold text-gray-900 text-sm">{camp.campaignName}</div>
                         <span className="inline-block mt-0.5 text-[10px] font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded">
                           {camp.campaignType}
+                        </span>
+                      </td>
+
+                      {/* Channel */}
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black inline-flex items-center gap-1 ${
+                            isSms
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}
+                        >
+                          {isSms ? (
+                            <>
+                              <Smartphone className="w-3 h-3" />
+                              SMS
+                            </>
+                          ) : (
+                            <>
+                              <MessageSquare className="w-3 h-3" />
+                              WhatsApp
+                            </>
+                          )}
                         </span>
                       </td>
 
