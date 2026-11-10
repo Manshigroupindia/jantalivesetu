@@ -25,7 +25,7 @@ export const ClientDirectoryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: clients, loading } = useRealtimeCollection<ClientRecord>('clientRecords', [
+  const { data: clients, loading } = useRealtimeCollection<ClientRecord & Record<string, any>>('clients', [
     orderBy('createdAt', 'desc'),
   ]);
 
@@ -37,7 +37,9 @@ export const ClientDirectoryPage: React.FC = () => {
     try {
       await createClientRecord({
         clientName,
+        companyName: clientName,
         contactPerson,
+        name: contactPerson || clientName,
         phone,
         email,
         address,
@@ -53,6 +55,7 @@ export const ClientDirectoryPage: React.FC = () => {
       setPhone('');
       setEmail('');
       setAddress('');
+      setGstNumber('');
       setNotes('');
       showToast('Client record added to directory.', 'success');
     } catch (err) {
@@ -62,11 +65,15 @@ export const ClientDirectoryPage: React.FC = () => {
     }
   };
 
-  const filtered = clients.filter(
-    (c) =>
-      c.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = clients.filter((c) => {
+    const term = searchTerm.toLowerCase();
+    const nameMatch = (c.clientName || c.name || '').toLowerCase().includes(term);
+    const personMatch = (c.contactPerson || '').toLowerCase().includes(term);
+    const companyMatch = (c.company || c.companyName || '').toLowerCase().includes(term);
+    const phoneMatch = (c.phone || '').includes(term);
+    const emailMatch = (c.email || '').toLowerCase().includes(term);
+    return nameMatch || personMatch || companyMatch || phoneMatch || emailMatch;
+  });
 
   return (
     <div className="space-y-6">
@@ -110,8 +117,8 @@ export const ClientDirectoryPage: React.FC = () => {
                   <Building className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-gray-900">{c.clientName}</h3>
-                  <p className="text-xs font-bold text-gray-500">{c.contactPerson}</p>
+                  <h3 className="text-base font-extrabold text-gray-900">{c.clientName || c.company || c.name || 'Unnamed Client'}</h3>
+                  <p className="text-xs font-bold text-gray-500">{c.contactPerson || c.name || 'Client Contact'}</p>
                 </div>
               </div>
 
@@ -120,14 +127,18 @@ export const ClientDirectoryPage: React.FC = () => {
                   <Phone className="w-3.5 h-3.5 text-brand-600 shrink-0" />
                   <span>{c.phone}</span>
                 </p>
-                <p className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-                  <span className="truncate">{c.email}</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0 mt-0.5" />
-                  <span>{c.address}</span>
-                </p>
+                {c.email && (
+                  <p className="flex items-center gap-2">
+                    <Mail className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                    <span className="truncate">{c.email}</span>
+                  </p>
+                )}
+                {(c.address || c.category) && (
+                  <p className="flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0 mt-0.5" />
+                    <span>{c.address || `Category: ${c.category}`}</span>
+                  </p>
+                )}
               </div>
             </Card>
           ))}

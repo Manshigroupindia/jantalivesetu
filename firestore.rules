@@ -33,7 +33,12 @@ service cloud.firestore {
     }
     
     function isApproved() {
-      return isAuthenticated() && getUserData().approved == true;
+      return isAuthenticated() && (
+        isDirector() ||
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true)
+      );
     }
 
     // USERS COLLECTION

@@ -1089,9 +1089,32 @@ export async function deleteCompanyHoliday(id: string): Promise<void> {
   await deleteDoc(docRef);
 }
 
-// Client Records
-export async function createClientRecord(client: Omit<ClientRecord, 'id'>): Promise<string> {
-  const docRef = await addDoc(collection(db, 'clientRecords'), client);
+// Client Records - Uses the unified 'clients' collection
+export async function createClientRecord(client: Omit<ClientRecord, 'id'> | any): Promise<string> {
+  const cleanPhone = (client.phone || '').trim();
+  const rawDigits = cleanPhone.replace(/[\s\-\(\)]/g, '');
+  const normalizedPhone = rawDigits.startsWith('+')
+    ? rawDigits
+    : (rawDigits.length === 10 ? `+91${rawDigits}` : rawDigits);
+
+  const docData = {
+    ...client,
+    name: client.contactPerson || client.clientName || client.name || '',
+    clientName: client.clientName || client.company || client.name || '',
+    company: client.companyName || client.clientName || client.company || '',
+    companyName: client.companyName || client.clientName || client.company || '',
+    contactPerson: client.contactPerson || client.name || '',
+    phone: cleanPhone,
+    normalizedPhone,
+    email: client.email || '',
+    address: client.address || '',
+    category: client.category || 'Other',
+    status: client.status || 'active',
+    whatsappConsent: client.whatsappConsent ?? true,
+    createdAt: client.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  const docRef = await addDoc(collection(db, 'clients'), docData);
   return docRef.id;
 }
 
